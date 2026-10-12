@@ -82,7 +82,21 @@
         <form id="auth-form" class="client-form">
           <label>
             Email address
-            <input name="email" type="email" autocomplete="email" required maxlength="320" />
+            <input
+              name="email"
+              type="email"
+              autocomplete="email"
+              inputmode="email"
+              autocapitalize="none"
+              spellcheck="false"
+              placeholder="you@gmail.com"
+              aria-describedby="auth-email-help"
+              required
+              maxlength="254"
+            />
+            <small class="field-help" id="auth-email-help">
+              Use an email address you can access to verify your account.
+            </small>
           </label>
           <label>
             Password
@@ -95,13 +109,30 @@
             </label>
             <label>
               Phone number
-              <input name="phone" type="tel" autocomplete="tel" maxlength="40" />
+              <input
+                name="phone"
+                type="tel"
+                autocomplete="tel"
+                inputmode="tel"
+                placeholder="09XX XXX XXXX or +639XX XXX XXXX"
+                aria-describedby="signup-phone-help"
+                maxlength="24"
+              />
+              <small class="field-help" id="signup-phone-help">
+                Philippine mobile number; enter 09XXXXXXXXX or +639XXXXXXXXX.
+              </small>
             </label>
           </div>
           <p class="form-message" id="auth-message" aria-live="polite"></p>
           <div class="form-actions">
             <button class="button" id="auth-submit" type="submit">Sign in</button>
-            <button class="button button--quiet" id="auth-toggle" type="button">
+            <button
+              class="button button--quiet"
+              id="auth-toggle"
+              type="button"
+              aria-controls="signup-fields"
+              aria-expanded="false"
+            >
               Create account
             </button>
           </div>
@@ -162,7 +193,18 @@
             </label>
             <label>
               Phone number <span class="label-optional">Optional</span>
-              <input name="phone" type="tel" autocomplete="tel" maxlength="40" />
+              <input
+                name="phone"
+                type="tel"
+                autocomplete="tel"
+                inputmode="tel"
+                placeholder="09XX XXX XXXX or +639XX XXX XXXX"
+                aria-describedby="profile-phone-help"
+                maxlength="24"
+              />
+              <small class="field-help" id="profile-phone-help">
+                Philippine mobile number; enter 09XXXXXXXXX or +639XXXXXXXXX.
+              </small>
             </label>
             <p id="profile-email" class="profile-email form-span"></p>
             <button class="button button--quiet" type="submit">Save contact details</button>

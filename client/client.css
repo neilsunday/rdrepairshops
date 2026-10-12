@@ -429,6 +429,25 @@ html[data-theme="dark"] .client-card {
   font-size: 0.82rem;
 }
 
+.field-help {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.auth-card .card-copy {
+  margin-bottom: 1.35rem;
+}
+
+.auth-card .form-actions {
+  margin-top: 0.35rem;
+}
+
+.signup-fields {
+  align-items: start;
+}
+
 .client-form input,
 .client-form select,
 .client-form textarea {

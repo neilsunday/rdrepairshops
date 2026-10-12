@@ -31,6 +31,9 @@
   );
   const photoInput = document.querySelector("#repair-photos");
   const photoPreviewList = document.querySelector("#photo-preview-list");
+  const emailInput = authForm.elements.email;
+  const signupPhoneInput = signupFields.querySelector("[name=phone]");
+  const profilePhoneInput = document.querySelector("#profile-form [name=phone]");
   let client;
   let currentUser;
   let signingUp = false;
@@ -39,6 +42,50 @@
   let activeServiceIndex = -1;
   let previewUrls = [];
   let pendingPhotoUpload = null;
+
+  const isValidEmail = (value) => {
+    if (value.length > 254) return false;
+    const separator = value.lastIndexOf("@");
+    if (separator < 1 || separator > 64 || separator === value.length - 1)
+      return false;
+    const local = value.slice(0, separator);
+    const domain = value.slice(separator + 1);
+    if (local.startsWith(".") || local.endsWith(".") || local.includes(".."))
+      return false;
+    return /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+$/i.test(local) &&
+      domain.split(".").every(
+        (label) =>
+          label.length > 0 &&
+          label.length <= 63 &&
+          /^[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?$/i.test(label),
+      ) &&
+      domain.includes(".");
+  };
+
+  const isValidPhilippineMobile = (value) => {
+    if (!/^[+\d().\s-]+$/.test(value)) return false;
+    const digits = value.replace(/\D/g, "");
+    return /^09\d{9}$/.test(digits) || /^639\d{9}$/.test(digits);
+  };
+
+  const updateEmailValidity = () => {
+    emailInput.value = emailInput.value.trim();
+    const value = emailInput.value.trim();
+    emailInput.setCustomValidity(
+      value && !isValidEmail(value)
+        ? "Enter a valid email address, such as you@gmail.com."
+        : "",
+    );
+  };
+
+  const updatePhoneValidity = (input) => {
+    const value = input.value.trim();
+    input.setCustomValidity(
+      value && !isValidPhilippineMobile(value)
+        ? "Enter a valid Philippine mobile number, such as 09171234567 or +639171234567."
+        : "",
+    );
+  };
 
   const showGlobalMessage = (message, error = false) => {
     globalNotice.hidden = error || !message;
@@ -605,6 +652,9 @@
     signingUp = !signingUp;
     signupFields.hidden = !signingUp;
     signupFields.querySelector("[name=display_name]").required = signingUp;
+    signupPhoneInput.required = signingUp;
+    if (!signingUp) signupPhoneInput.setCustomValidity("");
+    authToggle.setAttribute("aria-expanded", String(signingUp));
     document.querySelector("#auth-title").textContent = signingUp
       ? "Create your account"
       : "Sign in to continue";
@@ -616,11 +666,22 @@
     setFormMessage(authMessage, "");
   });
 
+  emailInput.addEventListener("input", updateEmailValidity);
+  signupPhoneInput.addEventListener("input", () =>
+    updatePhoneValidity(signupPhoneInput),
+  );
+  profilePhoneInput.addEventListener("input", () =>
+    updatePhoneValidity(profilePhoneInput),
+  );
+
   authForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    updateEmailValidity();
+    if (signingUp) updatePhoneValidity(signupPhoneInput);
+    else signupPhoneInput.setCustomValidity("");
     if (!authForm.reportValidity()) return;
     const form = new FormData(authForm);
-    const email = String(form.get("email") || "").trim();
+    const email = String(form.get("email") || "").trim().toLowerCase();
     const password = String(form.get("password") || "");
     authSubmit.disabled = true;
     authToggle.disabled = true;
@@ -644,6 +705,8 @@
           signingUp = false;
           signupFields.hidden = true;
           signupFields.querySelector("[name=display_name]").required = false;
+          signupPhoneInput.required = false;
+          authToggle.setAttribute("aria-expanded", "false");
           authSubmit.textContent = "Sign in";
           authToggle.textContent = "Create account";
           setFormMessage(
@@ -674,6 +737,7 @@
   document.querySelector("#profile-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    updatePhoneValidity(profilePhoneInput);
     if (!form.reportValidity()) return;
     const submit = form.querySelector("button[type=submit]");
     submit.disabled = true;
@@ -828,6 +892,9 @@
       signingUp = false;
       signupFields.hidden = true;
       signupFields.querySelector("[name=display_name]").required = false;
+      signupPhoneInput.required = false;
+      signupPhoneInput.setCustomValidity("");
+      authToggle.setAttribute("aria-expanded", "false");
       document.querySelector("#auth-title").textContent = "Sign in to continue";
       authSubmit.textContent = "Sign in";
       authToggle.textContent = "Create account";

@@ -124,6 +124,81 @@
     })),
   });
 
+  const loadCompletionProofRecords = async (client, proofs) => {
+    if (!proofs.length) return [];
+    const references = proofs.map((proof) => proof.reference_number);
+    const repairIds = proofs
+      .map((proof) => proof.repair_request_id)
+      .filter(Boolean);
+    const noteRows = [];
+    const loadNotes = async (column, values) => {
+      for (let offset = 0; offset < values.length; offset += 100) {
+        const { data, error } = await client
+          .from("repair_internal_notes")
+          .select(
+            "id,repair_request_id,repair_reference_snapshot,note,created_at,created_by",
+          )
+          .in(column, values.slice(offset, offset + 100));
+        if (error)
+          throw databaseError("Completion proof work notes could not be loaded", error);
+        noteRows.push(...(data || []));
+      }
+    };
+    await Promise.all([
+      loadNotes("repair_request_id", repairIds),
+      loadNotes("repair_reference_snapshot", references),
+    ]);
+
+    const proofByRepairId = new Map(
+      proofs
+        .filter((proof) => proof.repair_request_id)
+        .map((proof) => [proof.repair_request_id, proof]),
+    );
+    const notesByReference = new Map();
+    const seenNotes = new Set();
+    for (const note of noteRows) {
+      if (seenNotes.has(note.id)) continue;
+      seenNotes.add(note.id);
+      const proof = proofByRepairId.get(note.repair_request_id);
+      const reference =
+        proof?.reference_number || note.repair_reference_snapshot;
+      if (!reference) continue;
+      notesByReference.set(reference, [
+        ...(notesByReference.get(reference) || []),
+        note,
+      ]);
+    }
+
+    const authorIds = [
+      ...new Set(noteRows.map((note) => note.created_by).filter(Boolean)),
+    ];
+    const { data: authors, error: authorError } = authorIds.length
+      ? await client
+          .from("profiles")
+          .select("id,display_name")
+          .in("id", authorIds)
+      : { data: [], error: null };
+    if (authorError)
+      throw databaseError("Completion proof note authors could not be loaded", authorError);
+    const authorNames = new Map(
+      (authors || []).map((author) => [author.id, author.display_name]),
+    );
+
+    return proofs.map((proof) => ({
+      ...proof,
+      workNotes: (notesByReference.get(proof.reference_number) || [])
+        .sort(
+          (left, right) =>
+            Date.parse(left.created_at) - Date.parse(right.created_at),
+        )
+        .map((note) => ({
+          note: note.note,
+          createdAt: note.created_at,
+          author: authorNames.get(note.created_by) || "Owner",
+        })),
+    }));
+  };
+
   const mapRecord = (collection, record) => {
     if (collection === "customers") {
       return {
@@ -655,8 +730,37 @@
       const { error: stageError } = await client.rpc(
         "stage_ready_completion_proof_batches",
       );
-      if (stageError)
-        throw databaseError("Ready completion batches could not be prepared", stageError);
+      if (stageError) {
+        const { data: proofs, error: proofError } = await client
+          .from("repair_completion_proofs")
+          .select(
+            "id,repair_request_id,reference_number,customer_name,customer_email,customer_phone,device_type,brand,model,reported_issue,service_name,submitted_at,completed_at",
+          )
+          .order("completed_at", { ascending: true });
+        if (proofError)
+          throw databaseError(
+            `Ready completion batches could not be prepared (${stageError.message}); available proofs could not be loaded`,
+            proofError,
+          );
+        const records = await loadCompletionProofRecords(
+          client,
+          (proofs || []).map((proof) => ({
+            ...proof,
+            batch_id: null,
+            batchNumber: null,
+          })),
+        );
+        return {
+          mode: "production",
+          records,
+          readyCount: records.length,
+          waitingCount: records.length,
+          batchIds: [],
+          approvedProofCount: 0,
+          approvedBatchCount: 0,
+          batchPreparationError: stageError.message,
+        };
+      }
 
       const [
         { data: batches, error: batchError },
@@ -715,79 +819,11 @@
         ...proof,
         batchNumber: proofsById.get(proof.batch_id)?.batch_number,
       }));
-
-      const references = readyProofs.map((proof) => proof.reference_number);
-      const repairIds = readyProofs
-        .map((proof) => proof.repair_request_id)
-        .filter(Boolean);
-      const noteRows = [];
-      const loadNotes = async (column, values) => {
-        for (let offset = 0; offset < values.length; offset += 100) {
-          const { data, error } = await client
-            .from("repair_internal_notes")
-            .select(
-              "id,repair_request_id,repair_reference_snapshot,note,created_at,created_by",
-            )
-            .in(column, values.slice(offset, offset + 100));
-          if (error)
-            throw databaseError("Completion proof work notes could not be loaded", error);
-          noteRows.push(...(data || []));
-        }
-      };
-      await Promise.all([
-        loadNotes("repair_request_id", repairIds),
-        loadNotes("repair_reference_snapshot", references),
-      ]);
-      const notesByReference = new Map();
-      const proofByRepairId = new Map(
-        readyProofs
-          .filter((proof) => proof.repair_request_id)
-          .map((proof) => [proof.repair_request_id, proof]),
-      );
-      const seenNotes = new Set();
-      for (const note of noteRows) {
-        if (seenNotes.has(note.id)) continue;
-        seenNotes.add(note.id);
-        const proof = proofByRepairId.get(note.repair_request_id);
-        const reference =
-          proof?.reference_number || note.repair_reference_snapshot;
-        if (!reference) continue;
-        notesByReference.set(reference, [
-          ...(notesByReference.get(reference) || []),
-          note,
-        ]);
-      }
-
-      const authorIds = [
-        ...new Set(noteRows.map((note) => note.created_by).filter(Boolean)),
-      ];
-      const { data: authors, error: authorError } = authorIds.length
-        ? await client
-            .from("profiles")
-            .select("id,display_name")
-            .in("id", authorIds)
-        : { data: [], error: null };
-      if (authorError)
-        throw databaseError("Completion proof note authors could not be loaded", authorError);
-      const authorNames = new Map(
-        (authors || []).map((author) => [author.id, author.display_name]),
-      );
+      const records = await loadCompletionProofRecords(client, readyProofs);
 
       return {
         mode: "production",
-        records: readyProofs.map((proof) => ({
-          ...proof,
-          workNotes: (notesByReference.get(proof.reference_number) || [])
-            .sort(
-              (left, right) =>
-                Date.parse(left.created_at) - Date.parse(right.created_at),
-            )
-            .map((note) => ({
-              note: note.note,
-              createdAt: note.created_at,
-              author: authorNames.get(note.created_by) || "Owner",
-            })),
-        })),
+        records,
         readyCount: readyProofs.length,
         waitingCount: waitingCount || 0,
         batchIds,

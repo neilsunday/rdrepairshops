@@ -1359,6 +1359,10 @@ ol {
   grid-column: 2;
   grid-row: 3 / span 2;
 }
+.completion-proof-panel__download-fallback {
+  grid-column: 2;
+  grid-row: 3;
+}
 .completion-proof-panel__authorize {
   grid-column: 2;
   grid-row: 5;
@@ -1601,10 +1605,12 @@ ol {
   }
   .completion-proof-panel__copy,
   .completion-proof-panel__progress-label,
-  .completion-proof-panel__download {
+  .completion-proof-panel__download,
+  .completion-proof-panel__download-fallback {
     grid-column: 1;
   }
-  .completion-proof-panel__download {
+  .completion-proof-panel__download,
+  .completion-proof-panel__download-fallback {
     grid-row: auto;
     width: 100%;
   }

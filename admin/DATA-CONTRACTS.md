@@ -47,7 +47,7 @@ The dashboard deliberately has no repair-request deletion control, role assignme
 
 - `repair_completion_proofs`: owner-readable snapshots of completed repair identity, customer contact, device, concern, service, and submitted/completed timestamps. The request relation becomes null on request deletion; the snapshot remains.
 - The archive is populated by a database trigger and backfilled from completed requests present when migration `007_repair_completion_proofs.sql` runs. Browser clients have select-only owner access; direct insert, update, and delete are not granted.
-- The Admin Dashboard downloads a standalone styled HTML report after at least 10 archived completions. Associated owner work notes are included from `repair_internal_notes`; customer photos are intentionally excluded because retention cleanup removes them. After the report is saved and cleanup is explicitly approved, the temporary proof snapshots are deleted with their requests; the ten-count batch metadata and owner work notes/status history remain.
+- The Admin Dashboard downloads a standalone styled HTML report after at least 10 archived completions. If batch preparation is unavailable, the owner can manually download currently readable archived proofs without the ten-record minimum; this fallback does not authorize cleanup. Associated owner work notes are included from `repair_internal_notes`; customer photos are intentionally excluded because retention cleanup removes them. Only a full batched report that is explicitly approved can authorize cleanup. After approval and the 48-hour minimum, temporary proof snapshots are deleted with their requests; the ten-count batch metadata and owner work notes/status history remain.
 
 ### Customers
 

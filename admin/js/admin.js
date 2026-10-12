@@ -1029,6 +1029,14 @@
       download.type = "button";
       download.disabled = true;
       download.dataset.downloadCompletionProofs = "true";
+      const downloadFallback = makeElement(
+        "button",
+        "admin-button admin-button--primary completion-proof-panel__download-fallback",
+        "Download available proofs anyway",
+      );
+      downloadFallback.type = "button";
+      downloadFallback.hidden = true;
+      downloadFallback.dataset.downloadCompletionProofsAnyway = "true";
       const authorize = makeElement(
         "button",
         "admin-button completion-proof-panel__authorize",
@@ -1038,7 +1046,15 @@
       authorize.hidden = true;
       authorize.disabled = true;
       authorize.dataset.authorizeCompletionCleanup = "true";
-      panel.append(copy, progress, progressLabel, status, download, authorize);
+      panel.append(
+        copy,
+        progress,
+        progressLabel,
+        status,
+        download,
+        downloadFallback,
+        authorize,
+      );
       return panel;
     };
 
@@ -1051,6 +1067,9 @@
       const download = panel.querySelector("[data-download-completion-proofs]");
       const authorize = panel.querySelector(
         "[data-authorize-completion-cleanup]",
+      );
+      const downloadFallback = panel.querySelector(
+        "[data-download-completion-proofs-anyway]",
       );
       if (error) {
         completionProofRecords = [];
@@ -1065,12 +1084,31 @@
           : `Completion proof batches could not be loaded. Confirm migrations 007 and 008 were applied, then refresh. ${error.message}`;
         status.dataset.state = "error";
         download.disabled = true;
+        download.hidden = false;
+        downloadFallback.hidden = true;
         authorize.hidden = true;
         authorize.disabled = true;
         return;
       }
       completionProofRecords = result.records;
       downloadedCompletionBatchIds = [];
+      if (result.batchPreparationError) {
+        progress.hidden = true;
+        progressLabel.textContent = "";
+        download.hidden = true;
+        downloadFallback.hidden = result.records.length === 0;
+        downloadFallback.disabled =
+          !isProduction() || result.records.length === 0;
+        authorize.hidden = true;
+        authorize.disabled = true;
+        status.dataset.state = result.records.length ? "error" : "waiting";
+        status.textContent = result.records.length
+          ? `Completion batches could not be prepared, but ${result.records.length} saved proof record${result.records.length === 1 ? "" : "s"} can still be downloaded. This manual download will not approve cleanup. ${result.batchPreparationError}`
+          : `Completion batches could not be prepared and no proof records are visible to this account. Verify owner access and the completion-proof migrations. ${result.batchPreparationError}`;
+        return;
+      }
+      download.hidden = false;
+      downloadFallback.hidden = true;
       const readyCount = result.readyCount;
       const waitingCount = result.waitingCount;
       const approvedProofCount = result.approvedProofCount;
@@ -1123,9 +1161,14 @@
           }).format(date);
     };
 
-    const downloadCompletionProofReport = (records) => {
-      if (records.length < 10) {
-        showToast("The proof report unlocks after 10 repairs are completed.", "error");
+    const downloadCompletionProofReport = (records, allowPartial = false) => {
+      if (!records.length || (!allowPartial && records.length < 10)) {
+        showToast(
+          allowPartial
+            ? "No available completion proofs can be downloaded."
+            : "The proof report unlocks after 10 repairs are completed.",
+          "error",
+        );
         return false;
       }
       const generatedAt = formatReportDate(new Date().toISOString());
@@ -1179,7 +1222,9 @@ ${reportItems}
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      showToast(`Downloaded the report containing ${records.length} completion proofs.`);
+      showToast(
+        `Downloaded the report containing ${records.length} completion proof${records.length === 1 ? "" : "s"}.`,
+      );
       return true;
     };
 
@@ -2293,6 +2338,13 @@ ${reportItems}
           priority: "all",
         };
         loadModule("repairs", 0);
+        return;
+      }
+      const downloadProofsAnyway = event.target.closest(
+        "[data-download-completion-proofs-anyway]",
+      );
+      if (downloadProofsAnyway && activeModule === "notes") {
+        downloadCompletionProofReport(completionProofRecords, true);
         return;
       }
       const downloadProofs = event.target.closest(

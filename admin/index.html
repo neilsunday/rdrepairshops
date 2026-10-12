@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f7f5" />
+    <meta
+      name="description"
+      content="R&D Cellphone Repair admin dashboard UI preview."
+    />
+    <title>Admin Preview | R&amp;D Cellphone Repair</title>
+    <script src="./js/supabase-config.js"></script>
+    <script src="./js/supabase-client.js"></script>
+    <script src="./js/data-adapter.js"></script>
+    <script src="./js/admin.js"></script>
+    <link rel="stylesheet" href="./assets/admin.css" />
+  </head>
+  <body class="admin-body" data-admin-page data-admin-state="checking">
+    <a class="skip-link" id="admin-skip-link" href="#admin-access-title"
+      >Skip to dashboard</a
+    >
+    <svg
+      class="icon-library"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <symbol id="icon-arrow" viewBox="0 0 24 24">
+        <path d="M4 12h15m-6-6 6 6-6 6" />
+      </symbol>
+      <symbol id="icon-grid" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
+        <rect x="14" y="14" width="7" height="7" />
+      </symbol>
+      <symbol id="icon-repair" viewBox="0 0 24 24">
+        <path
+          d="M14.5 6.5a5 5 0 0 0-6.2 6.2L3 18l3 3 5.3-5.3a5 5 0 0 0 6.2-6.2l-3 3-3-3 3-3Z"
+        />
+      </symbol>
+      <symbol id="icon-users" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3" />
+        <path
+          d="M3 20v-1a6 6 0 0 1 12 0v1Zm13-9a3 3 0 1 0-1-5.8M18 14a5 5 0 0 1 3 5v1h-3"
+        />
+      </symbol>
+      <symbol id="icon-image" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="1" />
+        <circle cx="8.5" cy="9" r="1.5" />
+        <path d="m4 18 5-5 3 3 3-4 5 6" />
+      </symbol>
+      <symbol id="icon-comment" viewBox="0 0 24 24">
+        <path d="M4 4h16v13H9l-5 4V4Z" />
+        <path d="M8 9h8m-8 4h5" />
+      </symbol>
+      <symbol id="icon-services" viewBox="0 0 24 24">
+        <path d="M4 5h16M4 12h16M4 19h16" />
+        <circle cx="8" cy="5" r="2" />
+        <circle cx="15" cy="12" r="2" />
+        <circle cx="10" cy="19" r="2" />
+      </symbol>
+      <symbol id="icon-bell" viewBox="0 0 24 24">
+        <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Zm-8 12h4" />
+      </symbol>
+      <symbol id="icon-activity" viewBox="0 0 24 24">
+        <path d="M3 12h4l3-8 4 16 3-8h4" />
+      </symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3" />
+        <path
+          d="m19.4 15 .1.1 1.4 1.1-1.5 2.6-1.7-.7a8 8 0 0 1-1.7 1l-.3 1.9h-3l-.3-1.9a8 8 0 0 1-1.7-1l-1.7.7-1.5-2.6 1.4-1.1a7 7 0 0 1 0-2l-1.4-1.1 1.5-2.6 1.7.7a8 8 0 0 1 1.7-1l.3-1.9h3l.3 1.9a8 8 0 0 1 1.7 1l1.7-.7 1.5 2.6-1.4 1.1a7 7 0 0 1 0 2Z"
+          transform="translate(-1 -1) scale(1.08)"
+        />
+      </symbol>
+      <symbol id="icon-menu" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M18 6 6 18" />
+      </symbol>
+      <symbol id="icon-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <circle cx="10.8" cy="10.8" r="6.3" />
+        <path d="m15.5 15.5 4.2 4.2" />
+      </symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24">
+        <path d="M12 4v16M4 12h16" />
+      </symbol>
+      <symbol id="icon-filter" viewBox="0 0 24 24">
+        <path d="M4 6h16M7 12h10m-7 6h4" />
+      </symbol>
+    </svg>
+
+    <main
+      class="admin-access-gate"
+      id="admin-access-gate"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="admin-access-gate__content">
+        <a
+          class="admin-brand"
+          href="../index.html"
+          aria-label="R&D Cellphone Repair public website"
+        >
+          <span class="admin-brand__mark">R&amp;D</span>
+          <span class="admin-brand__name">CELLPHONE REPAIR</span>
+        </a>
+        <p class="admin-eyebrow">
+          <span class="eyebrow-line"></span> OWNER ACCESS
+        </p>
+        <h1 id="admin-access-title">Checking access</h1>
+        <p id="admin-access-message">
+          Verifying the current Supabase session and owner permission.
+        </p>
+        <a class="back-link" id="admin-access-login" href="./login/" hidden
+          >Continue to owner sign in</a
+        >
+        <a class="back-link" href="../index.html">Back to public website</a>
+      </div>
+    </main>
+    <button
+      class="sidebar-backdrop"
+      type="button"
+      aria-label="Close dashboard navigation"
+      tabindex="-1"
+      hidden
+    ></button>
+    <div class="admin-layout" id="admin-layout" hidden>
+      <aside
+        class="admin-sidebar"
+        id="admin-sidebar"
+        aria-label="Admin navigation"
+      >
+        <a
+          class="admin-brand"
+          href="../index.html"
+          aria-label="R&D Cellphone Repair public website"
+        >
+          <span class="admin-brand__mark">R&amp;D</span>
+          <span class="admin-brand__name">CELLPHONE REPAIR</span>
+        </a>
+        <p class="sidebar-caption">OWNER WORKSPACE</p>
+        <nav class="admin-nav" aria-label="Admin sections">
+          <button
+            class="admin-nav__item is-active"
+            type="button"
+            data-view-target="overview"
+            aria-current="page"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#icon-grid" /></svg
+            ><span>Overview</span>
+          </button>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-view-target="repairs"
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="#icon-repair" /></svg
+            ><span>Repair Management</span>
+          </button>
+          <span class="admin-nav__divider">MANAGEMENT</span>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-view-target="customers"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#icon-users" /></svg
+            ><span>Customers</span>
+          </button>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-view-target="posts"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#icon-image" /></svg
+            ><span>Repair Posts</span>
+          </button>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-view-target="comments"
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="#icon-comment" /></svg
+            ><span>Comments &amp; Moderation</span>
+          </button>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-view-target="services"
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="#icon-services" /></svg
+            ><span>Services</span>
+          </button>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-view-target="notifications"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#icon-bell" /></svg
+            ><span>Notifications</span>
+          </button>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-view-target="activity"
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="#icon-activity" /></svg
+            ><span>Activity Logs</span>
+          </button>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-view-target="settings"
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="#icon-settings" /></svg
+            ><span>Settings</span>
+          </button>
+        </nav>
+        <div class="sidebar-footer">
+          <span class="sidebar-preview" id="auth-mode-status"
+            ><span class="status-dot"></span> Checking owner session</span
+          >
+          <a class="sidebar-public-link" href="../index.html"
+            >View public website
+            <svg class="icon icon--small" aria-hidden="true">
+              <use href="#icon-arrow" /></svg
+          ></a>
+        </div>
+      </aside>
+
+      <div class="admin-workspace">
+        <header class="admin-topbar">
+          <button
+            class="icon-button sidebar-toggle"
+            id="sidebar-toggle"
+            type="button"
+            aria-label="Open dashboard navigation"
+            aria-controls="admin-sidebar"
+            aria-expanded="false"
+          >
+            <svg class="icon sidebar-toggle__open" aria-hidden="true">
+              <use href="#icon-menu" />
+            </svg>
+            <svg class="icon sidebar-toggle__close" aria-hidden="true">
+              <use href="#icon-close" />
+            </svg>
+          </button>
+          <div class="topbar-context">
+            <span class="topbar-context__eyebrow">R&amp;D / INTERNAL</span
+            ><span class="topbar-context__divider"></span
+            ><span id="admin-context-label">Verifying session</span>
+          </div>
+          <a class="topbar-public-link" href="../index.html"
+            >Public site
+            <svg class="icon icon--small" aria-hidden="true">
+              <use href="#icon-arrow" /></svg
+          ></a>
+          <button
+            class="topbar-signout"
+            id="admin-signout"
+            type="button"
+            hidden
+          >
+            Sign out
+          </button>
+          <button
+            class="topbar-signout"
+            id="admin-signout"
+            type="button"
+            hidden
+          >
+            Sign out
+          </button>
+        </header>
+
+        <main class="admin-main" id="admin-main">
+          <div class="preview-warning" id="preview-warning" role="note" hidden>
+            <svg class="icon" aria-hidden="true">
+              <use href="#icon-clock" />
+            </svg>
+            <p>
+              <strong>Unprotected preview.</strong> Dashboard data is isolated
+              demo content. Do not enter real customer information.
+              Authentication and database access are not connected.
+            </p>
+          </div>
+          <noscript>
+            <p class="module-state module-state--error">
+              This dashboard preview requires JavaScript. No real data is
+              connected.
+            </p>
+          </noscript>
+          <div id="module-view-host" aria-live="polite" aria-busy="false"></div>
+
+          <section
+            class="admin-view"
+            data-admin-view="overview"
+            aria-labelledby="page-title"
+            hidden
+          >
+            <div class="page-heading">
+              <div>
+                <p class="breadcrumb">Admin <span>/</span> Overview</p>
+                <h1 id="page-title">Overview</h1>
+                <p class="page-description">
+                  A sample view of the repair workflow.
+                </p>
+              </div>
+              <span class="data-label">MOCK DATA</span>
+            </div>
+
+            <section class="metric-grid" aria-label="Sample repair metrics">
+              <article class="metric-item">
+                <p class="metric-item__label">Open requests</p>
+                <p class="metric-item__value">08</p>
+                <p class="metric-item__note">Example count</p>
+              </article>
+              <article class="metric-item">
+                <p class="metric-item__label">Awaiting approval</p>
+                <p class="metric-item__value">03</p>
+                <p class="metric-item__note">Example count</p>
+              </article>
+              <article class="metric-item">
+                <p class="metric-item__label">In progress</p>
+                <p class="metric-item__value">04</p>
+                <p class="metric-item__note">Example count</p>
+              </article>
+              <article class="metric-item">
+                <p class="metric-item__label">Ready for pickup</p>
+                <p class="metric-item__value">02</p>
+                <p class="metric-item__note">Example count</p>
+              </article>
+            </section>
+
+            <div class="overview-grid">
+              <section
+                class="panel repairs-panel"
+                aria-labelledby="recent-repairs-title"
+              >
+                <div class="panel-heading">
+                  <div>
+                    <p class="panel-eyebrow">PREVIEW ROWS</p>
+                    <h2 id="recent-repairs-title">Recent repair requests</h2>
+                  </div>
+                  <button
+                    class="inline-action"
+                    type="button"
+                    data-view-target="repairs"
+                  >
+                    View all
+                    <svg class="icon icon--small" aria-hidden="true">
+                      <use href="#icon-arrow" />
+                    </svg>
+                  </button>
+                </div>
+                <p class="panel-note">
+                  Sample records only; no customer data is connected.
+                </p>
+                <div class="table-scroll">
+                  <table class="data-table">
+                    <caption class="visually-hidden">
+                      Recent mock repair requests
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th class="column-id" scope="col">Request</th>
+                        <th scope="col">Customer</th>
+                        <th scope="col">Device</th>
+                        <th class="column-summary" scope="col">Issue</th>
+                        <th scope="col">Status</th>
+                        <th class="column-updated" scope="col">Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody id="recent-repairs-body"></tbody>
+                  </table>
+                </div>
+                <p class="empty-message" id="recent-empty" hidden>
+                  No sample repair requests to display.
+                </p>
+              </section>
+
+              <section
+                class="panel activity-panel"
+                aria-labelledby="recent-activity-title"
+              >
+                <div class="panel-heading">
+                  <div>
+                    <p class="panel-eyebrow">PREVIEW EVENTS</p>
+                    <h2 id="recent-activity-title">Recent activity</h2>
+                  </div>
+                </div>
+                <p class="panel-note">
+                  Example activity; no changes have been performed.
+                </p>
+                <ol class="activity-list">
+                  <li>
+                    <span class="activity-marker"></span>
+                    <div>
+                      <p>
+                        <strong>Sample request logged</strong
+                        ><span> · Preview event</span>
+                      </p>
+                      <time datetime="2026-10-11">Today / sample</time>
+                    </div>
+                  </li>
+                  <li>
+                    <span class="activity-marker"></span>
+                    <div>
+                      <p>
+                        <strong>Sample status changed</strong
+                        ><span> · Preview event</span>
+                      </p>
+                      <time datetime="2026-10-10">Yesterday / sample</time>
+                    </div>
+                  </li>
+                  <li>
+                    <span class="activity-marker"></span>
+                    <div>
+                      <p>
+                        <strong>Sample repair marked ready</strong
+                        ><span> · Preview event</span>
+                      </p>
+                      <time datetime="2026-10-09">Earlier / sample</time>
+                    </div>
+                  </li>
+                </ol>
+              </section>
+            </div>
+            <p class="view-footnote">
+              All values and records on this screen are illustrative mock data.
+            </p>
+          </section>
+
+          <section
+            class="admin-view"
+            data-admin-view="repairs"
+            aria-labelledby="repairs-page-title"
+            hidden
+          >
+            <div class="page-heading">
+              <div>
+                <p class="breadcrumb">Admin <span>/</span> Repair Management</p>
+                <h1 id="repairs-page-title">Repair Management</h1>
+                <p class="page-description">
+                  Browse the sample requests included with this preview.
+                </p>
+              </div>
+              <span class="data-label">MOCK DATA</span>
+            </div>
+            <section
+              class="panel repairs-panel"
+              aria-labelledby="all-repairs-title"
+            >
+              <div class="panel-heading">
+                <div>
+                  <p class="panel-eyebrow">PREVIEW ROWS</p>
+                  <h2 id="all-repairs-title">Repair requests</h2>
+                </div>
+              </div>
+              <p class="panel-note">
+                Search and status filters apply to sample data only. Editing and
+                customer actions are not available.
+              </p>
+              <div class="repair-filters">
+                <label class="repair-search" for="repair-search"
+                  ><span class="visually-hidden">Search sample requests</span
+                  ><svg class="icon" aria-hidden="true">
+                    <use href="#icon-search" /></svg
+                  ><input
+                    id="repair-search"
+                    type="search"
+                    placeholder="Search request, customer, or device"
+                    autocomplete="off"
+                /></label>
+                <label class="repair-status-filter" for="repair-status"
+                  ><span>Status</span
+                  ><select id="repair-status">
+                    <option value="all">All statuses</option>
+                    <option value="awaiting approval">Awaiting approval</option>
+                    <option value="in progress">In progress</option>
+                    <option value="ready for pickup">Ready for pickup</option>
+                    <option value="completed">Completed</option>
+                  </select></label
+                >
+              </div>
+              <p
+                class="table-count"
+                id="repair-count"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              ></p>
+              <div class="table-scroll">
+                <table class="data-table">
+                  <caption class="visually-hidden">
+                    All mock repair requests
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th class="column-id" scope="col">Request</th>
+                      <th scope="col">Customer</th>
+                      <th scope="col">Device</th>
+                      <th class="column-summary" scope="col">Issue</th>
+                      <th scope="col">Status</th>
+                      <th class="column-updated" scope="col">Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody id="all-repairs-body"></tbody>
+                </table>
+              </div>
+              <p class="empty-message" id="repairs-empty" hidden>
+                No sample requests match these filters.
+              </p>
+            </section>
+            <p class="view-footnote">
+              This is a read-only UI preview. Supabase integration is required
+              before real repair records or changes can appear here.
+            </p>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

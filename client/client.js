@@ -33,7 +33,9 @@
   const photoPreviewList = document.querySelector("#photo-preview-list");
   const emailInput = authForm.elements.email;
   const signupPhoneInput = signupFields.querySelector("[name=phone]");
-  const profilePhoneInput = document.querySelector("#profile-form [name=phone]");
+  const profilePhoneInput = document.querySelector(
+    "#profile-form [name=phone]",
+  );
   let client;
   let currentUser;
   let signingUp = false;
@@ -52,14 +54,18 @@
     const domain = value.slice(separator + 1);
     if (local.startsWith(".") || local.endsWith(".") || local.includes(".."))
       return false;
-    return /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+$/i.test(local) &&
-      domain.split(".").every(
-        (label) =>
-          label.length > 0 &&
-          label.length <= 63 &&
-          /^[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?$/i.test(label),
-      ) &&
-      domain.includes(".");
+    return (
+      /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+$/i.test(local) &&
+      domain
+        .split(".")
+        .every(
+          (label) =>
+            label.length > 0 &&
+            label.length <= 63 &&
+            /^[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?$/i.test(label),
+        ) &&
+      domain.includes(".")
+    );
   };
 
   const isValidPhilippineMobile = (value) => {
@@ -189,7 +195,9 @@
           ? makeText("span", "service-option-category", service.category)
           : makeText("span", "service-option-category", "Describe your issue"),
       );
-      option.addEventListener("click", () => selectRepairService(service.fallback ? null : service));
+      option.addEventListener("click", () =>
+        selectRepairService(service.fallback ? null : service),
+      );
       serviceOptions.append(option);
     });
     if (term && matches.length === 0)
@@ -285,9 +293,7 @@
       ["approved", "in_progress", "ready_for_pickup"].includes(request.status),
     ).length;
     const pending = requests.filter((request) =>
-      ["submitted", "inspecting", "awaiting_approval"].includes(
-        request.status,
-      ),
+      ["submitted", "inspecting", "awaiting_approval"].includes(request.status),
     ).length;
     document.querySelector("#stat-total").textContent = String(requests.length);
     document.querySelector("#stat-pending").textContent = String(pending);
@@ -326,7 +332,15 @@
     heading.id = "repair-client-dialog-title";
     const fields = document.createElement("div");
     fields.className = "repair-client-dialog__fields";
-    const addField = ({ name, label, value = "", type = "text", required = false, rows, maxLength }) => {
+    const addField = ({
+      name,
+      label,
+      value = "",
+      type = "text",
+      required = false,
+      rows,
+      maxLength,
+    }) => {
       const wrapper = document.createElement("label");
       wrapper.className = "repair-edit-field";
       wrapper.append(makeText("span", "", label));
@@ -393,9 +407,7 @@
     service.name = "service_id";
     service.append(new Option("Other / not listed", ""));
     for (const item of repairServices) {
-      service.append(
-        new Option(`${item.name} · ${item.category}`, item.id),
-      );
+      service.append(new Option(`${item.name} · ${item.category}`, item.id));
     }
     if (
       request.service_id &&
@@ -449,7 +461,10 @@
       if (customerEmail.value && !isValidEmail(customerEmail.value)) {
         customerEmail.setCustomValidity("Enter a valid email address.");
       }
-      if (customerPhone.value && !isValidPhilippineMobile(customerPhone.value)) {
+      if (
+        customerPhone.value &&
+        !isValidPhilippineMobile(customerPhone.value)
+      ) {
         customerPhone.setCustomValidity(
           "Enter a valid Philippine mobile number, such as 09171234567 or +639171234567.",
         );
@@ -530,10 +545,11 @@
         .eq("repair_request_id", request.id);
       if (attachmentError) throw attachmentError;
 
-      const paths = (attachments || []).map((attachment) => attachment.object_path);
+      const paths = (attachments || []).map(
+        (attachment) => attachment.object_path,
+      );
       if (paths.length) {
-        const { error: storageError } = await client
-          .storage
+        const { error: storageError } = await client.storage
           .from("repair-attachments")
           .remove(paths);
         if (storageError)
@@ -586,7 +602,11 @@
         `We couldn’t load your repair updates. ${friendlyError(error)}`,
       ),
     );
-    const retry = makeText("button", "button button--quiet empty-state-action", "Try again");
+    const retry = makeText(
+      "button",
+      "button button--quiet empty-state-action",
+      "Try again",
+    );
     retry.type = "button";
     retry.addEventListener("click", () =>
       document.querySelector("#refresh-repairs").click(),
@@ -621,7 +641,10 @@
     try {
       await loadRepairs();
     } catch (refreshError) {
-      console.error("Booking succeeded but repair list refresh failed:", refreshError);
+      console.error(
+        "Booking succeeded but repair list refresh failed:",
+        refreshError,
+      );
       showRepairLoadError(refreshError);
       setFormMessage(
         bookingMessage,
@@ -661,7 +684,11 @@
         "repair-service",
         `${request.device_type} · ${request.service_name_snapshot || "Other / not listed"}`,
       ),
-      makeText("p", "repair-meta", `Submitted ${formatDate(request.submitted_at)}`),
+      makeText(
+        "p",
+        "repair-meta",
+        `Submitted ${formatDate(request.submitted_at)}`,
+      ),
     );
     if (request.status === "completed" && request.completed_at) {
       const completedTime = Date.parse(request.completed_at);
@@ -671,7 +698,7 @@
           "p",
           "repair-retention",
           cleanupTime > Date.now()
-            ? `Eligible for cleanup after ${formatDate(new Date(cleanupTime).toISOString())}, once the owner has downloaded and approved a 10-repair proof batch.`
+            ? `Eligible for cleanup after ${formatDate(new Date(cleanupTime).toISOString())}, once the owner has downloaded.`
             : "Past the 2-day minimum retention. Cleanup still waits for a full 10-repair proof batch and owner download approval.",
         );
         article.append(retention);
@@ -682,7 +709,10 @@
       const issue = document.createElement("details");
       issue.className = "repair-issue-details";
       const summary = makeText("summary", "", "Issue description");
-      issue.append(summary, makeText("p", "repair-issue", request.reported_issue));
+      issue.append(
+        summary,
+        makeText("p", "repair-issue", request.reported_issue),
+      );
       article.append(issue);
     }
 
@@ -701,7 +731,11 @@
       const historyDetails = document.createElement("details");
       historyDetails.className = "repair-history-details";
       historyDetails.append(
-        makeText("summary", "", `${histories.length} status ${histories.length === 1 ? "update" : "updates"}`),
+        makeText(
+          "summary",
+          "",
+          `${histories.length} status ${histories.length === 1 ? "update" : "updates"}`,
+        ),
       );
       const list = document.createElement("ol");
       list.className = "repair-history";
@@ -710,9 +744,7 @@
         const label = `${formatStatus(entry.to_status)} · ${formatDate(entry.created_at)}`;
         line.append(makeText("strong", "", label));
         if (entry.customer_message)
-          line.append(
-            document.createTextNode(` — ${entry.customer_message}`),
-          );
+          line.append(document.createTextNode(` — ${entry.customer_message}`));
         list.append(line);
       }
       historyDetails.append(list);
@@ -768,7 +800,13 @@
   };
 
   const loadRepairs = async () => {
-    repairList.replaceChildren(makeText("p", "empty-state empty-state--loading", "Loading your repair requests…"));
+    repairList.replaceChildren(
+      makeText(
+        "p",
+        "empty-state empty-state--loading",
+        "Loading your repair requests…",
+      ),
+    );
     const { data: requests, error: requestError } = await client
       .from("repair_requests")
       .select(
@@ -806,9 +844,7 @@
         .order("created_at", { ascending: true }),
       client
         .from("repair_attachments")
-        .select(
-          "repair_request_id,object_path,original_filename,content_type",
-        )
+        .select("repair_request_id,object_path,original_filename,content_type")
         .in("repair_request_id", requestIds)
         .order("created_at", { ascending: true }),
     ]);
@@ -823,7 +859,8 @@
     }
     const attachmentsByRequest = new Map();
     for (const attachment of attachmentResult.data || []) {
-      const entries = attachmentsByRequest.get(attachment.repair_request_id) || [];
+      const entries =
+        attachmentsByRequest.get(attachment.repair_request_id) || [];
       entries.push(attachment);
       attachmentsByRequest.set(attachment.repair_request_id, entries);
     }
@@ -872,10 +909,12 @@
       document.querySelector("#profile-email").textContent =
         `Email: ${user.email || "Unavailable"}`;
       await Promise.all([loadServices(), loadRepairs()]);
-      document.querySelector("#dashboard-heading").setAttribute(
-        "aria-label",
-        `Welcome back, ${profile.display_name || user.email || "Customer"}`,
-      );
+      document
+        .querySelector("#dashboard-heading")
+        .setAttribute(
+          "aria-label",
+          `Welcome back, ${profile.display_name || user.email || "Customer"}`,
+        );
       authPanel.hidden = true;
       workspace.hidden = false;
       document.body.dataset.clientSignedIn = "true";
@@ -968,7 +1007,9 @@
         if (pendingNavigationTarget) return;
         const visible = entries
           .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+          .sort(
+            (left, right) => right.intersectionRatio - left.intersectionRatio,
+          )[0];
         if (visible) setActiveCustomerNavigation(visible.target.id);
       },
       { rootMargin: "-18% 0px -68% 0px", threshold: [0, 0.2, 0.5, 1] },
@@ -1042,7 +1083,9 @@
       ? "Create your account"
       : "Sign in to continue";
     authSubmit.textContent = signingUp ? "Create account" : "Sign in";
-    authToggle.textContent = signingUp ? "I already have an account" : "Create account";
+    authToggle.textContent = signingUp
+      ? "I already have an account"
+      : "Create account";
     authForm.querySelector("[name=password]").autocomplete = signingUp
       ? "new-password"
       : "current-password";
@@ -1064,11 +1107,16 @@
     else signupPhoneInput.setCustomValidity("");
     if (!authForm.reportValidity()) return;
     const form = new FormData(authForm);
-    const email = String(form.get("email") || "").trim().toLowerCase();
+    const email = String(form.get("email") || "")
+      .trim()
+      .toLowerCase();
     const password = String(form.get("password") || "");
     authSubmit.disabled = true;
     authToggle.disabled = true;
-    setFormMessage(authMessage, signingUp ? "Creating your account…" : "Signing in…");
+    setFormMessage(
+      authMessage,
+      signingUp ? "Creating your account…" : "Signing in…",
+    );
     try {
       let user;
       if (signingUp) {
@@ -1117,34 +1165,36 @@
     }
   });
 
-  document.querySelector("#profile-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    updatePhoneValidity(profilePhoneInput);
-    if (!form.reportValidity()) return;
-    const submit = form.querySelector("button[type=submit]");
-    submit.disabled = true;
-    try {
-      const { error } = await client
-        .from("profiles")
-        .update({
-          display_name: form.elements.display_name.value.trim(),
-          phone: form.elements.phone.value.trim() || null,
-        })
-        .eq("id", currentUser.id);
-      if (error) throw error;
-      document.querySelector("#customer-label").textContent =
-        form.elements.display_name.value.trim();
-      document.querySelector("#workspace-customer-label").textContent =
-        currentUser.email || "Customer account";
-      showGlobalMessage("Your contact details have been saved.");
-    } catch (error) {
-      console.error("Customer profile update failed:", error);
-      showGlobalMessage(friendlyError(error), true);
-    } finally {
-      submit.disabled = false;
-    }
-  });
+  document
+    .querySelector("#profile-form")
+    .addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      updatePhoneValidity(profilePhoneInput);
+      if (!form.reportValidity()) return;
+      const submit = form.querySelector("button[type=submit]");
+      submit.disabled = true;
+      try {
+        const { error } = await client
+          .from("profiles")
+          .update({
+            display_name: form.elements.display_name.value.trim(),
+            phone: form.elements.phone.value.trim() || null,
+          })
+          .eq("id", currentUser.id);
+        if (error) throw error;
+        document.querySelector("#customer-label").textContent =
+          form.elements.display_name.value.trim();
+        document.querySelector("#workspace-customer-label").textContent =
+          currentUser.email || "Customer account";
+        showGlobalMessage("Your contact details have been saved.");
+      } catch (error) {
+        console.error("Customer profile update failed:", error);
+        showGlobalMessage(friendlyError(error), true);
+      } finally {
+        submit.disabled = false;
+      }
+    });
 
   bookingForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1225,7 +1275,10 @@
       try {
         if (!files.length) await loadRepairs();
       } catch (refreshError) {
-        console.error("Booking succeeded but repair list refresh failed:", refreshError);
+        console.error(
+          "Booking succeeded but repair list refresh failed:",
+          refreshError,
+        );
         setFormMessage(
           bookingMessage,
           `Request ${request.reference_number} was submitted, but your list could not refresh. Use Refresh to try again.`,
@@ -1245,61 +1298,69 @@
     }
   });
 
-  document.querySelector("#refresh-repairs").addEventListener("click", async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      await loadRepairs();
-      showGlobalMessage("Your repair requests are up to date.");
-    } catch (error) {
-      console.error("Customer repair refresh failed:", error);
-      showRepairLoadError(error);
-      showGlobalMessage(friendlyError(error), true);
-    } finally {
-      button.disabled = false;
-    }
-  });
+  document
+    .querySelector("#refresh-repairs")
+    .addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        await loadRepairs();
+        showGlobalMessage("Your repair requests are up to date.");
+      } catch (error) {
+        console.error("Customer repair refresh failed:", error);
+        showRepairLoadError(error);
+        showGlobalMessage(friendlyError(error), true);
+      } finally {
+        button.disabled = false;
+      }
+    });
 
-  document.querySelector("#sign-out").addEventListener("click", async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      const { error } = await client.auth.signOut();
-      if (error) throw error;
-      currentUser = null;
-      delete document.body.dataset.clientSignedIn;
-      workspace.hidden = true;
-      authPanel.hidden = false;
-      document.querySelector("#customer-label").textContent = "";
-      document.querySelector("#workspace-customer-label").textContent = "";
-      document.querySelector("#profile-form").reset();
-      signingUp = false;
-      signupFields.hidden = true;
-      signupFields.querySelector("[name=display_name]").required = false;
-      signupPhoneInput.required = false;
-      signupPhoneInput.setCustomValidity("");
-      authToggle.setAttribute("aria-expanded", "false");
-      document.querySelector("#auth-title").textContent = "Sign in to continue";
-      authSubmit.textContent = "Sign in";
-      authToggle.textContent = "Create account";
-      setFormMessage(authMessage, "");
-      repairList.replaceChildren();
-      ["#stat-total", "#stat-pending", "#stat-progress", "#stat-completed"].forEach(
-        (selector) => {
+  document
+    .querySelector("#sign-out")
+    .addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const { error } = await client.auth.signOut();
+        if (error) throw error;
+        currentUser = null;
+        delete document.body.dataset.clientSignedIn;
+        workspace.hidden = true;
+        authPanel.hidden = false;
+        document.querySelector("#customer-label").textContent = "";
+        document.querySelector("#workspace-customer-label").textContent = "";
+        document.querySelector("#profile-form").reset();
+        signingUp = false;
+        signupFields.hidden = true;
+        signupFields.querySelector("[name=display_name]").required = false;
+        signupPhoneInput.required = false;
+        signupPhoneInput.setCustomValidity("");
+        authToggle.setAttribute("aria-expanded", "false");
+        document.querySelector("#auth-title").textContent =
+          "Sign in to continue";
+        authSubmit.textContent = "Sign in";
+        authToggle.textContent = "Create account";
+        setFormMessage(authMessage, "");
+        repairList.replaceChildren();
+        [
+          "#stat-total",
+          "#stat-pending",
+          "#stat-progress",
+          "#stat-completed",
+        ].forEach((selector) => {
           document.querySelector(selector).textContent = "—";
-        },
-      );
-      document.querySelector("#repair-count-label").textContent = "";
-      showGlobalMessage("You have signed out.");
-      authForm.reset();
-      renderPhotoPreviews([]);
-    } catch (error) {
-      console.error("Customer sign-out failed:", error);
-      showGlobalMessage(friendlyError(error), true);
-    } finally {
-      button.disabled = false;
-    }
-  });
+        });
+        document.querySelector("#repair-count-label").textContent = "";
+        showGlobalMessage("You have signed out.");
+        authForm.reset();
+        renderPhotoPreviews([]);
+      } catch (error) {
+        console.error("Customer sign-out failed:", error);
+        showGlobalMessage(friendlyError(error), true);
+      } finally {
+        button.disabled = false;
+      }
+    });
 
   const renderPhotoPreviews = (files) => {
     previewUrls.forEach((url) => URL.revokeObjectURL(url));
@@ -1354,7 +1415,8 @@
     const message = validatePhotos(files);
     setFormMessage(
       bookingMessage,
-      message || (files.length ? `${files.length} photo(s) ready to upload.` : ""),
+      message ||
+        (files.length ? `${files.length} photo(s) ready to upload.` : ""),
       Boolean(message),
     );
   });

@@ -6,17 +6,17 @@ The repository contains Supabase migrations and an owner dashboard configured to
 
 The default dashboard uses Supabase Auth and the authenticated browser client. Owner authorization and row access must continue to be enforced by RLS; a service-role key must never be placed in browser code. The `?preview=1` dashboard is still isolated, synthetic, and read-only.
 
-The dashboard currently supports owner reads and writes for repair requests, services, showcase post text/status, comment moderation, notification read state, and business settings. Customer-directory and activity entries are read-only. The public site remains a static catalog; showcase media upload, private repair attachments, and anonymous repair intake are not implemented by the dashboard.
+The dashboard supports owner reads and writes for repair requests, services, showcase post text/status, comment moderation, notification read state, and business settings. Customer-directory and activity entries are read-only. The customer portal supports authenticated repair intake and private repair photos after migrations `001` through `003` are applied. Anonymous repair intake and showcase media upload are not supported.
 
 ## Migration Order
 
 1. In the Supabase Dashboard, select the correct project and confirm you have a restorable backup or a new/empty database.
-2. Run the read-only preflight queries below in the SQL Editor. Inspect any names that overlap the migration. The migration intentionally uses ordinary `CREATE` statements without `DROP`, `CREATE OR REPLACE`, or broad `IF NOT EXISTS`; a conflicting object should stop application for review.
+2. Run the read-only preflight queries below in the SQL Editor. Inspect any names that overlap the baseline migration. Migration `001` intentionally uses ordinary `CREATE` statements without `DROP` or broad `IF NOT EXISTS`; a conflicting object should stop application for review.
 3. Review `migrations/001_initial_schema.sql` and confirm the project is a supported Supabase PostgreSQL version with the Supabase-managed `auth` schema and `anon`, `authenticated`, and `service_role` roles.
 4. In SQL Editor, paste and run the complete `001_initial_schema.sql` once. It uses an explicit transaction. If it fails, do not remove statements or rerun blindly; inspect the reported object/state, restore if appropriate, then prepare a reviewed follow-up migration.
-5. Confirm tables, RLS, policies, the helper function, and the owner views used by the dashboard using the verification checklist below.
-6. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
-7. Configure private Storage buckets and policies only if a separately reviewed upload flow is introduced. Database table RLS does not authorize Storage objects.
+5. Apply `migrations/002_owner_customer_directory.sql` and confirm its owner view along with the baseline tables, RLS, policies, and helper functions using the verification checklist below.
+6. Apply `migrations/003_customer_repair_booking.sql` after confirming `001` and `002` are installed. It configures the private repair-photo bucket and scoped customer/owner policies; database table RLS alone does not authorize Storage objects.
+7. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
 
 ## Exact ordered manual checklist
 
@@ -31,6 +31,7 @@ The dashboard currently supports owner reads and writes for repair requests, ser
 3. Apply migrations in dependency order.
    - Run `supabase/migrations/001_initial_schema.sql` first.
    - Only after that is confirmed, run `supabase/migrations/002_owner_customer_directory.sql`. The owner dashboard's Customers section depends on `public.owner_customer_directory`.
+   - Only after `001` and `002` are confirmed, run `supabase/migrations/003_customer_repair_booking.sql`. It configures private `repair-attachments` Storage access and enforces the customer photo limits.
    - Do not run the SQL in a different order or with destructive resets.
 
 4. Create or invite the owner Auth account.
@@ -58,6 +59,8 @@ The dashboard currently supports owner reads and writes for repair requests, ser
     - Test a customer-authenticated session and confirm it can only access its own records.
     - Confirm a non-owner customer cannot read admin-only data or internal notes.
     - Confirm the owner can read admin-only tables and manage the supported records through the dashboard. The dashboard does not currently use Realtime.
+    - As a customer, submit a repair with up to five JPEG, PNG, WebP, or HEIC photos (at most 5 MiB each). Confirm the owner sees the booking and can view its photos in repair details.
+    - Confirm an anonymous user cannot read the private repair bucket and a customer cannot read another customer's booking or photos.
 
 ### Read-only preflight queries
 
@@ -157,53 +160,11 @@ Do not grant owner in user metadata, from client JavaScript, from a public RPC, 
 
 ## Storage Setup
 
-Create these buckets manually after checking the preflight bucket list. Do not reuse an existing bucket until its current contents, public flag, size limits, MIME allow-list, and policies have been reviewed.
+Run `migrations/003_customer_repair_booking.sql` after preflight and after migrations `001` and `002`. It configures `repair-attachments` as a private bucket, accepts JPEG, PNG, WebP, and HEIC up to 5 MiB each, and installs policies for a customer to upload/read only photos attached to that customer's requests. A database trigger enforces five photos per customer repair request. The owner can read attachments through short-lived signed URLs in repair details. The migration deliberately does not grant object access to `anon`.
 
-| Bucket               | Visibility | Purpose                                                                                                                                                                                     |
-| -------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `repair-attachments` | Private    | Customer/owner repair photos or documents. Use object paths `<auth-user-uuid>/<repair-request-uuid>/<file-uuid>-<safe-name>` and enforce file size/type limits appropriate to the business. |
-| `showcase-media`     | Private    | Owner-uploaded draft and published showcase media. Keep objects private in every state.                                                                                                     |
+The migration updates the bucket's visibility, file size limit, and MIME allow-list if that bucket already exists. Before running it, review existing bucket contents/settings and `storage.objects` policies; the migration creates named policies and will stop on a naming conflict. Do not make the bucket public or add broad authenticated object access.
 
-Do not put unpublished media in a public bucket. For public showcase display, a future trusted Edge Function/server endpoint must verify that the parent post is `published`, then issue a short-lived signed URL for the requested `post_media` object. That function is **not** included in this phase. Never expose a service-role key in the browser. If the owner later chooses a public bucket instead, only deliberately published objects may be copied there, and deleting/hiding the database row will not make an already public object private.
-
-Supabase Storage enforces object access through `storage.objects` policies, separately from the metadata table policies. After inspecting existing Storage policies for name conflicts, the following are the intended `repair-attachments` policies. Supabase's `storage.foldername(name)` returns the directory components of the object path.
-
-```sql
-CREATE POLICY repair_attachment_objects_owner_all
-ON storage.objects FOR ALL TO authenticated
-USING (bucket_id = 'repair-attachments' AND app_private.is_owner())
-WITH CHECK (bucket_id = 'repair-attachments' AND app_private.is_owner());
-
-CREATE POLICY repair_attachment_objects_customer_read_own
-ON storage.objects FOR SELECT TO authenticated
-USING (
-  bucket_id = 'repair-attachments'
-  AND (storage.foldername(name))[1] = auth.uid()::text
-  AND (storage.foldername(name))[2] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-  AND EXISTS (
-    SELECT 1 FROM public.repair_requests AS request
-    WHERE request.id = ((storage.foldername(name))[2])::uuid
-      AND request.customer_id = auth.uid()
-  )
-);
-
-CREATE POLICY repair_attachment_objects_customer_upload_own
-ON storage.objects FOR INSERT TO authenticated
-WITH CHECK (
-  bucket_id = 'repair-attachments'
-  AND (storage.foldername(name))[1] = auth.uid()::text
-  AND (storage.foldername(name))[2] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-  AND EXISTS (
-    SELECT 1 FROM public.repair_requests AS request
-    WHERE request.id = ((storage.foldername(name))[2])::uuid
-      AND request.customer_id = auth.uid()
-  )
-);
-```
-
-For `showcase-media`, add an owner-only `storage.objects` policy for `SELECT`, `INSERT`, `UPDATE`, and `DELETE` using `bucket_id = 'showcase-media' AND app_private.is_owner()` in both `USING` and `WITH CHECK`. Do not add an anonymous object-read policy. Published media delivery must go through the future signed-URL endpoint described above. The `repair_attachments` metadata policies allow an authenticated customer to read/insert metadata only for their own request; the owner can manage metadata. Validate storage paths, metadata, file content, and parent ownership together in the later upload flow.
-
-These policy snippets are documentation for a separately reviewed Storage setup step; they are not executed by the migration in this phase. Policy names must also be checked before use.
+`showcase-media` remains private and is not configured for uploads. For public showcase display, a future trusted Edge Function/server endpoint must verify that the parent post is `published`, then issue a short-lived signed URL. Never expose a service-role key in the browser.
 
 ## Realtime Setup
 
@@ -287,12 +248,12 @@ Perform these tests in a non-production project with two distinct customer Auth 
 - [ ] Verify the owner retains reaction select/delete access after a post is unpublished, while customers do not.
 - [ ] Verify only the owner can read/update `business_settings`, and the authenticated client cannot delete the singleton row.
 - [ ] Confirm an account with an `admin` enum role but no `owner` role does not get owner access.
-- [ ] Confirm Storage owner policies work independently from table RLS and that a private object is not readable from an anonymous URL.
+- [ ] Confirm customer uploads are private, per-request photo limits are enforced, and owner signed URLs work.
 
 ## Remaining Limitations
 
 - No SQL was run and no remote project state was inspected in this workspace session. Review preflight output before applying the migration.
-- No buckets or `storage.objects` policies are created by this migration; follow the separate Storage procedure after checking existing state.
+- The repair booking migration has not been run against the remote Supabase project from this workspace. Review preflight output and verify its policies in the target project before enabling live customer uploads.
 - No Edge Function for public signed showcase URLs exists. Published post media remains private until that trusted service is built.
 - The public inquiry form is not connected; customer-created repair requests require a signed-in customer. Anonymous repair intake needs a separately reviewed rate-limited Edge Function, not an anon INSERT policy.
 - Realtime membership does not create subscriptions or prove that a UI subscription is safe; test per-user event filtering.

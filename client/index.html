@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f7f5" />
+    <meta
+      name="description"
+      content="Book a cellphone repair and track your repair requests."
+    />
+    <title>My Repairs | R&amp;D Cellphone Repair</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <link rel="stylesheet" href="./client.css" />
+    <script src="../admin/js/supabase-config.js"></script>
+    <script src="../admin/js/supabase-client.js"></script>
+    <script src="./client.js" defer></script>
+  </head>
+  <body class="client-body">
+    <a class="skip-link" href="#client-main">Skip to content</a>
+    <header class="client-header">
+      <a class="brand" href="../" aria-label="R&D Cellphone Repair home">
+        <span class="brand__mark">R&amp;D</span>
+        <span class="brand__name">CELLPHONE REPAIR</span>
+      </a>
+      <a class="text-link" href="../">Back to website</a>
+    </header>
+
+    <main class="client-main" id="client-main">
+      <section class="client-intro" aria-labelledby="client-title">
+        <p class="eyebrow"><span class="eyebrow__line"></span> CUSTOMER PORTAL</p>
+        <h1 id="client-title">Repairs, <span>in one place.</span></h1>
+        <p>
+          Book a repair, share photos of the issue, and follow customer-visible
+          updates from our team.
+        </p>
+      </section>
+
+      <div class="client-notice" id="client-notice" role="status" aria-live="polite" hidden></div>
+      <div class="client-error" id="client-error" role="alert" hidden></div>
+
+      <section class="client-card auth-card" id="auth-panel" aria-labelledby="auth-title">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">YOUR ACCOUNT</p>
+            <h2 id="auth-title">Sign in to continue</h2>
+          </div>
+          <span class="card-index">01</span>
+        </div>
+        <p class="card-copy">
+          An account keeps your repair requests and updates private to you.
+        </p>
+        <form id="auth-form" class="client-form">
+          <label>
+            Email address
+            <input name="email" type="email" autocomplete="email" required maxlength="320" />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" autocomplete="current-password" required minlength="8" />
+          </label>
+          <div id="signup-fields" class="signup-fields" hidden>
+            <label>
+              Full name
+              <input name="display_name" type="text" autocomplete="name" maxlength="160" />
+            </label>
+            <label>
+              Phone number
+              <input name="phone" type="tel" autocomplete="tel" maxlength="40" />
+            </label>
+          </div>
+          <p class="form-message" id="auth-message" aria-live="polite"></p>
+          <div class="form-actions">
+            <button class="button" id="auth-submit" type="submit">Sign in</button>
+            <button class="button button--quiet" id="auth-toggle" type="button">
+              Create account
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="client-workspace" id="workspace" hidden>
+        <div class="workspace-bar">
+          <div>
+            <p class="eyebrow">SIGNED IN AS</p>
+            <strong id="customer-label"></strong>
+          </div>
+          <button class="button button--quiet button--small" id="sign-out" type="button">
+            Sign out
+          </button>
+        </div>
+
+        <section class="client-card profile-card" aria-labelledby="profile-title">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">ACCOUNT DETAILS</p>
+              <h2 id="profile-title">Your contact details</h2>
+            </div>
+            <span class="card-index">01</span>
+          </div>
+          <form id="profile-form" class="client-form profile-form">
+            <label>
+              Full name
+              <input name="display_name" type="text" autocomplete="name" required maxlength="160" />
+            </label>
+            <label>
+              Phone number
+              <input name="phone" type="tel" autocomplete="tel" maxlength="40" />
+            </label>
+            <p class="profile-email" id="profile-email"></p>
+            <button class="button button--quiet" type="submit">Save contact details</button>
+          </form>
+        </section>
+
+        <section class="client-card booking-card" aria-labelledby="booking-title">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">NEW REQUEST</p>
+              <h2 id="booking-title">Book a repair</h2>
+            </div>
+            <span class="card-index">02</span>
+          </div>
+          <p class="card-copy">
+            Tell us about your device. A photo is optional and can help our team
+            understand the issue.
+          </p>
+          <form id="booking-form" class="client-form booking-form">
+            <div class="form-grid">
+              <label>
+                Device type
+                <select name="device_type" required>
+                  <option value="">Choose device type</option>
+                  <option>Smartphone</option>
+                  <option>Tablet</option>
+                  <option>Smartwatch</option>
+                  <option>Other device</option>
+                </select>
+              </label>
+              <label>
+                Brand
+                <input name="brand" type="text" required maxlength="100" placeholder="e.g. Apple" />
+              </label>
+              <label>
+                Model
+                <input name="model" type="text" required maxlength="160" placeholder="e.g. iPhone 14" />
+              </label>
+              <label>
+                Repair service
+                <select name="service_id" id="service-select">
+                  <option value="">Other / not listed</option>
+                </select>
+              </label>
+              <label class="form-span">
+                What is wrong with your device?
+                <textarea name="reported_issue" rows="5" required maxlength="5000" placeholder="Describe the problem, when it started, and anything else we should know."></textarea>
+              </label>
+              <label class="form-span">
+                Photos of the issue <span class="label-optional">Optional · up to 5 · 5 MB each</span>
+                <input
+                  id="repair-photos"
+                  name="photos"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic"
+                  multiple
+                />
+              </label>
+            </div>
+            <p class="photo-help">Accepted: JPEG, PNG, WebP, or HEIC. Please avoid photos containing passwords or sensitive personal information.</p>
+            <p class="form-message" id="booking-message" aria-live="polite"></p>
+            <button class="button" id="booking-submit" type="submit">Submit repair request</button>
+          </form>
+        </section>
+
+        <section class="client-card repairs-card" aria-labelledby="repairs-title">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">YOUR HISTORY</p>
+              <h2 id="repairs-title">Repair requests</h2>
+            </div>
+            <button class="button button--quiet button--small" id="refresh-repairs" type="button">
+              Refresh
+            </button>
+          </div>
+          <div class="repair-list" id="repair-list" aria-live="polite"></div>
+        </section>
+      </section>
+      <footer class="client-footer">
+        <a href="../admin/login/">Owner sign in</a>
+        <span>Private customer portal · R&amp;D Cellphone Repair</span>
+      </footer>
+    </main>
+  </body>
+</html>

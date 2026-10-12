@@ -1088,6 +1088,25 @@ ol {
   font-size: 0.76rem;
   overflow-wrap: anywhere;
 }
+.detail-field--wide {
+  grid-column: 1 / -1;
+}
+.repair-attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.repair-attachment-link {
+  width: 110px;
+  height: 110px;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+}
+.repair-attachment-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .settings-panel > .panel-note {
   max-width: 650px;
 }

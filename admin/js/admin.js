@@ -1494,6 +1494,7 @@
       if (!record || !detailPanel) return;
       const content = detailPanel.querySelector(".repair-detail-content");
       content.replaceChildren();
+      detailPanel.dataset.repairId = record.id;
       [
         [
           "Customer",
@@ -1530,6 +1531,50 @@
         );
         content.append(field);
       });
+      const attachmentsField = makeElement("div", "detail-field detail-field--wide");
+      attachmentsField.append(
+        makeElement("dt", "", "Customer photos"),
+        makeElement(
+          "dd",
+          "repair-attachment-list",
+          isProduction() ? "Loading photos…" : "Photos are not included in preview data.",
+        ),
+      );
+      content.append(attachmentsField);
+      if (isProduction()) {
+        window.AdminDataAdapter.getRepairAttachments(record.id)
+          .then((attachments) => {
+            if (detailPanel.dataset.repairId !== record.id) return;
+            const gallery = attachmentsField.querySelector("dd");
+            gallery.replaceChildren();
+            if (!attachments.length) {
+              gallery.textContent = "No photos attached.";
+              return;
+            }
+            attachments.forEach((attachment) => {
+              const link = makeElement("a", "repair-attachment-link");
+              link.href = attachment.signedUrl;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              link.setAttribute(
+                "aria-label",
+                `Open customer photo ${attachment.original_filename}`,
+              );
+              const image = makeElement("img", "repair-attachment-image");
+              image.src = attachment.signedUrl;
+              image.alt = attachment.original_filename;
+              image.loading = "lazy";
+              link.append(image);
+              gallery.append(link);
+            });
+          })
+          .catch((error) => {
+            console.error("Repair photo loading failed:", error);
+            if (detailPanel.dataset.repairId === record.id)
+              attachmentsField.querySelector("dd").textContent =
+                error.message || "Repair photos could not be loaded.";
+          });
+      }
       detailPanel.hidden = false;
       detailPanel.scrollIntoView({
         behavior: reducedMotion.matches ? "auto" : "smooth",

@@ -1,0 +1,346 @@
+.client-body {
+  min-height: 100vh;
+}
+
+.client-header {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 max(1.25rem, calc((100vw - 1120px) / 2));
+  border-bottom: 1px solid var(--color-border);
+}
+
+.client-main {
+  width: min(920px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: clamp(2rem, 6vw, 4.5rem) 0 2rem;
+}
+
+.client-intro {
+  max-width: 680px;
+  margin-bottom: 2rem;
+}
+
+.client-intro h1 {
+  margin: 0.7rem 0;
+  font-size: clamp(2.25rem, 6vw, 4.25rem);
+  line-height: 1.03;
+  letter-spacing: -0.065em;
+}
+
+.client-intro h1 span {
+  color: var(--color-muted);
+}
+
+.client-intro > p:last-child,
+.card-copy,
+.photo-help {
+  color: var(--color-muted);
+}
+
+.client-card {
+  margin-top: 1rem;
+  padding: clamp(1.15rem, 3vw, 2rem);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.card-heading,
+.workspace-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.card-heading h2 {
+  margin-top: 0.25rem;
+  font-size: clamp(1.25rem, 3vw, 1.7rem);
+  letter-spacing: -0.035em;
+}
+
+.card-index {
+  color: var(--color-subtle);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-copy {
+  margin: 0.65rem 0 1.1rem;
+  max-width: 620px;
+}
+
+.client-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.client-form label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.client-form input,
+.client-form select,
+.client-form textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 2px;
+  background: var(--color-page);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.client-form input[type="file"] {
+  min-height: auto;
+  padding: 0.55rem;
+}
+
+.client-form textarea {
+  min-height: 130px;
+  resize: vertical;
+}
+
+.client-form input:focus,
+.client-form select:focus,
+.client-form textarea:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.signup-fields,
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.signup-fields[hidden],
+.client-workspace[hidden],
+.auth-card[hidden],
+[hidden] {
+  display: none !important;
+}
+
+.form-span {
+  grid-column: 1 / -1;
+}
+
+.label-optional {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.button--quiet {
+  background: transparent;
+  color: var(--color-text);
+}
+
+.button--quiet:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.form-message {
+  min-height: 1.2em;
+  color: var(--color-muted);
+  font-size: 0.86rem;
+}
+
+.form-message[data-state="error"] {
+  color: #a83232;
+}
+
+.client-notice,
+.client-error {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.9rem;
+}
+
+.client-error,
+.client-notice[data-state="error"] {
+  border-color: #b84b4b;
+  color: #a83232;
+}
+
+.client-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.workspace-bar {
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.profile-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+}
+
+.profile-email {
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.profile-form > button {
+  justify-self: start;
+}
+
+.photo-help {
+  margin-top: -0.5rem;
+  font-size: 0.8rem;
+}
+
+.repair-list {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.empty-state {
+  padding: 1.2rem;
+  border: 1px dashed var(--color-border-strong);
+  color: var(--color-muted);
+}
+
+.repair-card {
+  padding: 1.1rem;
+  border: 1px solid var(--color-border);
+}
+
+.repair-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.repair-card h3 {
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+}
+
+.repair-meta,
+.repair-issue,
+.repair-message,
+.repair-history,
+.repair-photos {
+  margin-top: 0.7rem;
+  color: var(--color-muted);
+  font-size: 0.86rem;
+}
+
+.repair-issue {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.status-badge {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.repair-history {
+  padding-left: 1.2rem;
+}
+
+.repair-history li + li {
+  margin-top: 0.3rem;
+}
+
+.repair-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.repair-photos a {
+  width: 86px;
+  height: 86px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.repair-photos img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.client-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.client-footer a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+@media (max-width: 620px) {
+  .client-header {
+    min-height: 66px;
+    padding-inline: 1rem;
+  }
+
+  .client-header .brand__name {
+    max-width: 6rem;
+  }
+
+  .client-header > .text-link {
+    font-size: 0.8rem;
+  }
+
+  .signup-fields,
+  .form-grid,
+  .profile-form {
+    grid-template-columns: 1fr;
+  }
+
+  .form-span {
+    grid-column: auto;
+  }
+
+  .profile-form > button {
+    justify-self: stretch;
+  }
+
+  .client-footer {
+    flex-direction: column;
+  }
+}

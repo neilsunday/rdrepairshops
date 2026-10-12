@@ -608,6 +608,26 @@
         throw databaseError("Repair request could not be created", error);
       return data;
     },
+    async getRepairAttachments(repairId) {
+      const client = await window.AdminSupabaseClient.get();
+      const { data, error } = await client
+        .from("repair_attachments")
+        .select("object_path,original_filename,content_type,byte_size")
+        .eq("repair_request_id", repairId)
+        .order("created_at", { ascending: true });
+      if (error)
+        throw databaseError("Repair photos could not be loaded", error);
+      return Promise.all(
+        (data || []).map(async (attachment) => {
+          const { data: signed, error: signedError } = await client.storage
+            .from("repair-attachments")
+            .createSignedUrl(attachment.object_path, 300);
+          if (signedError)
+            throw databaseError("A repair photo could not be opened", signedError);
+          return { ...attachment, signedUrl: signed.signedUrl };
+        }),
+      );
+    },
     async updateRepair(id, payload) {
       const allowed = [
         "customer_name",

@@ -144,12 +144,29 @@
       <section class="client-workspace" id="workspace" hidden>
         <div class="customer-dashboard-layout">
           <aside class="customer-sidebar" aria-label="Customer dashboard navigation">
+            <button
+              class="customer-menu-toggle"
+              id="customer-menu-toggle"
+              type="button"
+              aria-controls="customer-navigation"
+              aria-expanded="false"
+              aria-label="Open dashboard navigation"
+            >
+              <span class="customer-menu-toggle__icon" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </span>
+              <span>Menu</span>
+            </button>
             <div class="customer-sidebar__brand">
               <span class="customer-sidebar__mark">R&amp;D</span>
               <span>MY REPAIR<br />DASHBOARD</span>
             </div>
             <p class="customer-sidebar__caption">YOUR ACCOUNT</p>
-            <nav class="customer-nav" aria-label="Dashboard sections">
+            <nav
+              class="customer-nav"
+              id="customer-navigation"
+              aria-label="Dashboard sections"
+            >
               <a class="customer-nav__link is-active" href="#dashboard-overview" data-customer-nav>
                 <span class="customer-nav__icon" aria-hidden="true">01</span>
                 <span>Overview<small>Repair summary</small></span>

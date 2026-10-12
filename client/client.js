@@ -904,6 +904,31 @@
     });
   };
 
+  const customerSidebar = document.querySelector(".customer-sidebar");
+  const customerMenuToggle = document.querySelector("#customer-menu-toggle");
+  const setCustomerNavigationOpen = (isOpen) => {
+    customerSidebar.dataset.navigationOpen = String(isOpen);
+    customerMenuToggle.setAttribute("aria-expanded", String(isOpen));
+    customerMenuToggle.setAttribute(
+      "aria-label",
+      isOpen ? "Close dashboard navigation" : "Open dashboard navigation",
+    );
+  };
+  customerMenuToggle.addEventListener("click", () => {
+    setCustomerNavigationOpen(
+      customerMenuToggle.getAttribute("aria-expanded") !== "true",
+    );
+  });
+  document.addEventListener("keydown", (event) => {
+    if (
+      event.key === "Escape" &&
+      customerMenuToggle.getAttribute("aria-expanded") === "true"
+    ) {
+      setCustomerNavigationOpen(false);
+      customerMenuToggle.focus();
+    }
+  });
+
   let pendingNavigationTarget = "";
   let navigationResetTimer;
   document.querySelectorAll("[data-customer-nav]").forEach((link) => {
@@ -920,6 +945,7 @@
       );
       window.history.replaceState(null, "", link.hash);
       setActiveCustomerNavigation(target.id);
+      setCustomerNavigationOpen(false);
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });

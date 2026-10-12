@@ -309,6 +309,18 @@
     let currentUserId = null;
     const moduleQueryState = new Map();
     let searchTimer;
+    let toastTimer;
+    const toast = document.querySelector("#admin-toast");
+
+    const showToast = (message, state = "success") => {
+      window.clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.dataset.state = state;
+      toast.hidden = false;
+      toastTimer = window.setTimeout(() => {
+        toast.hidden = true;
+      }, 5000);
+    };
 
     const isProduction = () =>
       window.AdminDataAdapter?.mode === "production";
@@ -483,6 +495,53 @@
       table.append(head, body);
       wrapper.append(table);
       return wrapper;
+    };
+
+    const createNotificationList = (records) => {
+      const list = makeElement("div", "notification-list");
+      records.forEach((record) => {
+        const item = makeElement(
+          "article",
+          `notification-card${record.status === "unread" ? " is-unread" : ""}`,
+        );
+        const body = makeElement("div", "notification-card__body");
+        const titleRow = makeElement("div", "notification-card__title");
+        titleRow.append(
+          makeElement("h3", "", record.title || "Notification"),
+          makeElement(
+            "span",
+            `notification-state notification-state--${record.status}`,
+            record.status,
+          ),
+        );
+        body.append(
+          titleRow,
+          makeElement(
+            "p",
+            "notification-card__detail",
+            record.detail || "No additional details.",
+          ),
+          makeElement(
+            "time",
+            "notification-card__time",
+            formatValue("createdAt", record.createdAt),
+          ),
+        );
+        item.append(body);
+        if (record.status === "unread") {
+          const action = makeElement(
+            "button",
+            "admin-button notification-card__action",
+            "Mark as read",
+          );
+          action.type = "button";
+          action.dataset.recordAction = "mark-read";
+          action.dataset.recordId = record.id;
+          item.append(action);
+        }
+        list.append(item);
+      });
+      return list;
     };
 
     const makeDataPanel = (definition) => {
@@ -728,7 +787,13 @@
           detail.setAttribute("aria-labelledby", "repair-detail-title");
           const title = makeElement("h2", "", "Repair details");
           title.id = "repair-detail-title";
-          detail.append(title, makeElement("div", "repair-detail-content"));
+          const workLog = makeElement("section", "work-log");
+          workLog.dataset.workLog = "true";
+          detail.append(
+            title,
+            makeElement("div", "repair-detail-content"),
+            workLog,
+          );
           view.append(detail);
         }
         view.append(
@@ -767,7 +832,12 @@
           : `0 ${definition.title.toLowerCase()} records`;
       const tableHost = panel.querySelector(".module-table-host");
       tableHost.replaceChildren();
-      if (filtered.length) tableHost.append(createTable(definition, filtered));
+      if (filtered.length)
+        tableHost.append(
+          moduleKey === "notifications"
+            ? createNotificationList(filtered)
+            : createTable(definition, filtered),
+        );
       const pagination = panel.querySelector("[data-module-pagination]");
       pagination.replaceChildren();
       if (activeTotal > 25) {
@@ -780,6 +850,113 @@
         next.dataset.pageChange = String(activePage + 1);
         next.disabled = (activePage + 1) * 25 >= activeTotal;
         pagination.append(previous, next);
+      }
+    };
+
+    const renderWorkNotes = (record, hostElement) => {
+      hostElement.replaceChildren();
+      const heading = makeElement("h3", "", "Work log & proof notes");
+      const privacy = makeElement(
+        "p",
+        "work-log__privacy",
+        "Owner-only record. These notes are not shown to the customer.",
+      );
+      const list = makeElement("ol", "work-log__entries");
+      (record.workNotes || []).forEach((entry) => {
+        const item = makeElement("li", "work-log__entry");
+        const meta = makeElement("div", "work-log__meta");
+        meta.append(
+          makeElement("strong", "", entry.author || "Owner"),
+          makeElement(
+            "time",
+            "",
+            formatValue("createdAt", entry.createdAt),
+          ),
+        );
+        item.append(meta, makeElement("p", "", entry.note));
+        list.append(item);
+      });
+      if (!list.childElementCount)
+        list.append(
+          makeElement(
+            "li",
+            "work-log__empty",
+            "No work notes yet. Record what was repaired, parts used, and final checks performed.",
+          ),
+        );
+
+      const form = document.createElement("form");
+      form.className = "work-log__form";
+      form.dataset.workNoteForm = "true";
+      form.dataset.repairId = record.id;
+      const label = makeElement(
+        "label",
+        "work-log__label",
+        "Add a service work note",
+      );
+      const input = document.createElement("textarea");
+      input.name = "note";
+      input.rows = 3;
+      input.maxLength = 8000;
+      input.required = true;
+      input.placeholder =
+        "Work performed, parts replaced, tests completed, and any follow-up needed…";
+      label.append(input);
+      const actions = makeElement("div", "work-log__actions");
+      const submit = makeElement(
+        "button",
+        "admin-button admin-button--primary",
+        "Save work note",
+      );
+      submit.type = "submit";
+      const status = makeElement("span", "work-log__status");
+      status.dataset.workNoteStatus = "true";
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      actions.append(submit, status);
+      form.append(label, actions);
+      hostElement.append(heading, privacy, list, form);
+    };
+
+    const saveWorkNote = async (form) => {
+      const repairId = form.dataset.repairId;
+      const record = activeRecords.find((item) => item.id === repairId);
+      const input = form.elements.note;
+      const submit = form.querySelector('[type="submit"]');
+      const status = form.querySelector("[data-work-note-status]");
+      const note = input.value.trim();
+      if (!record || !form.reportValidity()) return;
+      if (!note) {
+        status.textContent = "Add a work note before saving.";
+        input.focus();
+        return;
+      }
+      submit.disabled = true;
+      status.textContent = "Saving work note…";
+      try {
+        const saved = await window.AdminDataAdapter.addInternalNote(
+          repairId,
+          note,
+          currentUserId,
+        );
+        record.workNotes = [
+          ...(record.workNotes || []),
+          {
+            note,
+            createdAt: saved.created_at || new Date().toISOString(),
+            author: "Owner",
+          },
+        ];
+        record.internalNotes = [...(record.internalNotes ? [record.internalNotes] : []), note].join("\n");
+        renderWorkNotes(
+          record,
+          host.querySelector("[data-work-log]"),
+        );
+        showToast("Work note saved to the repair record.");
+      } catch (error) {
+        console.error("Repair work note save failed:", error);
+        status.textContent = error.message || "Work note could not be saved.";
+        submit.disabled = false;
       }
     };
 
@@ -1112,7 +1289,7 @@
           });
           addEditorField(fields, {
             key: "internal_note",
-            label: "Add internal note",
+            label: "Add private work note",
             rows: 3,
           });
         }
@@ -1316,9 +1493,16 @@
     });
     host.addEventListener("submit", (event) => {
       const settingsForm = event.target.closest("[data-settings-form]");
-      if (!settingsForm) return;
-      event.preventDefault();
-      saveSettingsForm(settingsForm);
+      if (settingsForm) {
+        event.preventDefault();
+        saveSettingsForm(settingsForm);
+        return;
+      }
+      const workNoteForm = event.target.closest("[data-work-note-form]");
+      if (workNoteForm) {
+        event.preventDefault();
+        saveWorkNote(workNoteForm);
+      }
     });
     host.addEventListener("click", (event) => {
       const navigation = event.target.closest("[data-view-target]");
@@ -1340,7 +1524,7 @@
       if (createRecord) {
         openEditor(createRecord.dataset.createRecord).catch((error) => {
           console.error("Could not open record editor:", error);
-          window.alert(error.message || "The editor could not be opened.");
+          showToast(error.message || "The editor could not be opened.", "error");
         });
         return;
       }
@@ -1364,10 +1548,18 @@
           customer_visible_note:
             "Your repair is complete. Please contact the shop to arrange pickup.",
         })
-          .then(() => loadModule(activeModule, activePage))
+          .then(() => {
+            showToast(
+              `Repair ${record.reference} marked done. The customer dashboard will show the completed status.`,
+            );
+            return loadModule(activeModule, activePage);
+          })
           .catch((error) => {
             console.error("Repair completion update failed:", error);
-            window.alert(error.message || "The repair could not be marked done.");
+            showToast(
+              error.message || "The repair could not be marked done.",
+              "error",
+            );
             recordAction.disabled = false;
             recordAction.textContent = "Mark as done";
           });
@@ -1379,9 +1571,13 @@
           recordAction.dataset.recordId,
         )
           .then(() => loadModule(activeModule, activePage))
+          .then(() => showToast("Notification marked as read."))
           .catch((error) => {
             console.error("Notification update failed:", error);
-            window.alert(error.message || "Notification could not be updated.");
+            showToast(
+              error.message || "Notification could not be updated.",
+              "error",
+            );
             recordAction.disabled = false;
           });
         return;
@@ -1393,7 +1589,7 @@
         if (record)
           openEditor(activeModule, record).catch((error) => {
             console.error("Could not open record editor:", error);
-            window.alert(error.message || "The editor could not be opened.");
+            showToast(error.message || "The editor could not be opened.", "error");
           });
         return;
       }
@@ -1435,7 +1631,6 @@
             )
             .join("; "),
         ],
-        ["Internal notes", record.internalNotes],
         ["Customer-visible notes", record.customerVisibleNotes],
       ].forEach(([labelText, value]) => {
         const field = makeElement("div", "detail-field");
@@ -1445,6 +1640,7 @@
         );
         content.append(field);
       });
+      renderWorkNotes(record, detailPanel.querySelector("[data-work-log]"));
       const attachmentsField = makeElement("div", "detail-field detail-field--wide");
       attachmentsField.append(
         makeElement("dt", "", "Customer photos"),
@@ -1517,7 +1713,7 @@
           window.location.replace(new URL("./login/", window.location.href));
         } catch (error) {
           console.error("Owner sign-out failed:", error);
-          window.alert("Sign-out failed. Please try again.");
+          showToast("Sign-out failed. Please try again.", "error");
           button.disabled = false;
         }
       });

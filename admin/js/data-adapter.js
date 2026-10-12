@@ -90,7 +90,7 @@
     };
   };
 
-  const mapRepair = (request, technician, histories, notes) => ({
+  const mapRepair = (request, technician, histories, notes, profileNames) => ({
     id: request.id,
     reference: request.reference_number,
     customerId: request.customer_id,
@@ -116,6 +116,11 @@
       occurredAt: entry.created_at,
     })),
     internalNotes: notes.map((entry) => entry.note).join("\n"),
+    workNotes: notes.map((entry) => ({
+      note: entry.note,
+      createdAt: entry.created_at,
+      author: profileNames.get(entry.created_by) || "Owner",
+    })),
   });
 
   const mapRecord = (collection, record) => {
@@ -344,33 +349,47 @@
               .filter(Boolean),
           ),
         ];
-        const [historyResult, noteResult, technicianResult] = await Promise.all(
-          [
-            client
-              .from("repair_status_history")
-              .select("repair_request_id,to_status,customer_message,created_at")
-              .in("repair_request_id", ids)
-              .order("created_at", { ascending: true }),
-            client
-              .from("repair_internal_notes")
-              .select("repair_request_id,note,created_at")
-              .in("repair_request_id", ids)
-              .order("created_at", { ascending: true }),
-            technicianIds.length
-              ? client
-                  .from("profiles")
-                  .select("id,display_name")
-                  .in("id", technicianIds)
-              : Promise.resolve({ data: [], error: null }),
-          ],
-        );
-        if (historyResult.error || noteResult.error || technicianResult.error)
+        const [historyResult, noteResult] = await Promise.all([
+          client
+            .from("repair_status_history")
+            .select("repair_request_id,to_status,customer_message,created_at")
+            .in("repair_request_id", ids)
+            .order("created_at", { ascending: true }),
+          client
+            .from("repair_internal_notes")
+            .select("repair_request_id,note,created_at,created_by")
+            .in("repair_request_id", ids)
+            .order("created_at", { ascending: true }),
+        ]);
+        if (historyResult.error || noteResult.error)
           throw databaseError(
             "Could not load repair details",
-            historyResult.error || noteResult.error || technicianResult.error,
+            historyResult.error || noteResult.error,
           );
-        const technicians = new Map(
-          (technicianResult.data || []).map((row) => [row.id, row]),
+        const profileIds = [
+          ...new Set([
+            ...technicianIds,
+            ...(noteResult.data || [])
+              .map((row) => row.created_by)
+              .filter(Boolean),
+          ]),
+        ];
+        const profileResult = profileIds.length
+          ? await client
+              .from("profiles")
+              .select("id,display_name")
+              .in("id", profileIds)
+          : { data: [], error: null };
+        if (profileResult.error)
+          throw databaseError(
+            "Could not load repair work-note authors",
+            profileResult.error,
+          );
+        const profiles = new Map(
+          (profileResult.data || []).map((row) => [row.id, row]),
+        );
+        const profileNames = new Map(
+          [...profiles].map(([id, profile]) => [id, profile.display_name]),
         );
         const histories = new Map();
         for (const row of historyResult.data || [])
@@ -389,9 +408,10 @@
           records: records.map((row) =>
             mapRepair(
               row,
-              technicians.get(row.assigned_technician_id),
+              profiles.get(row.assigned_technician_id),
               histories.get(row.id) || [],
               notes.get(row.id) || [],
+              profileNames,
             ),
           ),
           total: count || 0,
@@ -554,7 +574,7 @@
       const { data, error } = await client
         .from("repair_internal_notes")
         .insert({ repair_request_id: repairId, note, created_by: userId })
-        .select("id")
+        .select("id,created_at,created_by")
         .single();
       if (error) throw databaseError("Internal note could not be saved", error);
       return data;

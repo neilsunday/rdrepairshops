@@ -18,10 +18,11 @@ The dashboard deliberately has no direct customer deletion, role assignment, Sto
 
 ### Repair requests
 
-- `id`, human-readable `reference_number`, nullable `customer_id`, customer name/email/phone snapshot, `device_type`, `brand`, `model`, `reported_issue`, nullable `service_id`, `status`, `priority`, `submitted_at`, `updated_at`, nullable `assigned_technician_id`, `internal_notes`, `customer_visible_notes`.
+- `id`, human-readable `reference_number`, nullable `customer_id`, customer name/email/phone snapshot, `device_type`, `brand`, `model`, `reported_issue`, nullable `service_id`, `status`, `priority`, `submitted_at`, `updated_at`, nullable `assigned_technician_id`, private `repair_internal_notes`, and customer-visible status messages.
 - Status values: `submitted`, `inspecting`, `awaiting_approval`, `approved`, `in_progress`, `ready_for_pickup`, `completed`, `cancelled`.
 - Priority values: `low`, `normal`, `high`, `urgent`.
 - Keep customer-contact snapshots on a request so historical records remain understandable if a profile changes. Contact fields are private.
+- The owner dashboard work log reuses `repair_internal_notes` for timestamped service completion evidence (work performed, parts used, and checks completed). It is owner-only and must never be presented as a customer-visible update.
 
 ### Repair status history
 

@@ -16,7 +16,7 @@ The dashboard supports owner reads and writes for repair requests, services, not
 4. In SQL Editor, paste and run the complete `001_initial_schema.sql` once. It uses an explicit transaction. If it fails, do not remove statements or rerun blindly; inspect the reported object/state, restore if appropriate, then prepare a reviewed follow-up migration.
 5. Apply `migrations/002_owner_customer_directory.sql` and confirm its owner view along with the baseline tables, RLS, policies, and helper functions using the verification checklist below.
 6. Apply `migrations/003_customer_repair_booking.sql` after confirming `001` and `002` are installed. It configures the private repair-photo bucket and scoped customer/owner policies; database table RLS alone does not authorize Storage objects.
-7. Apply `migrations/004_public_business_profile.sql` after confirming `001` is installed. It seeds existing public contact values if needed and exposes only the allowlisted public profile view.
+7. Apply `migrations/004_public_business_profile.sql` after confirming `001` is installed. It creates only the allowlisted public profile view; it does not write to owner-protected settings.
 8. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
 
 ## Exact ordered manual checklist
@@ -33,7 +33,7 @@ The dashboard supports owner reads and writes for repair requests, services, not
    - Run `supabase/migrations/001_initial_schema.sql` first.
    - Only after that is confirmed, run `supabase/migrations/002_owner_customer_directory.sql`. The owner dashboard's Customers section depends on `public.owner_customer_directory`.
    - Only after `001` and `002` are confirmed, run `supabase/migrations/003_customer_repair_booking.sql`. It configures private `repair-attachments` Storage access and enforces the customer photo limits.
-   - Run `supabase/migrations/004_public_business_profile.sql` after `001`. This enables public profile synchronization without granting access to the owner-only settings table.
+   - Run `supabase/migrations/004_public_business_profile.sql` after `001`. This enables public profile synchronization without granting access to or writing to the owner-only settings table.
    - Do not run the SQL in a different order or with destructive resets.
 
 4. Create or invite the owner Auth account.
@@ -124,7 +124,7 @@ Internal repair notes are in `repair_internal_notes`, not a column on customer-r
 
 The profiles trigger creates a profile for new Auth users and backfills existing `auth.users` into the newly created profile table without overwriting conflicts. It does **not** assign roles. Profile email is a private snapshot created from Auth; email changes should be managed through Supabase Auth and synchronized deliberately in a future integration.
 
-`business_settings` is a singleton (`id = 1`) containing `business_name`, `public_phone`, `public_email`, `public_address`, `business_hours`, `notification_preferences`, `updated_by`, and timestamps. It is owner-only. Migration `004_public_business_profile.sql` creates a public view restricted to the business name, public contact details, and business hours; it does not expose notification preferences or owner identifiers. The website uses the allowlisted view to update its Contact section and branding. The service catalog's public `is_active` concept maps to `repair_services.status = 'active'`.
+`business_settings` is a singleton (`id = 1`) containing `business_name`, `public_phone`, `public_email`, `public_address`, `business_hours`, `notification_preferences`, `updated_by`, and timestamps. It is owner-only. Migration `004_public_business_profile.sql` creates a public view restricted to the business name, public contact details, and business hours; it does not expose notification preferences or owner identifiers, and does not seed or modify settings. If the singleton row does not yet exist, save Business Profile once from the verified owner dashboard to create it. The website uses the allowlisted view to update its Contact section and branding. The service catalog's public `is_active` concept maps to `repair_services.status = 'active'`.
 
 Public showcase clients should query `public_showcase_posts`, `public_showcase_media`, and `public_approved_comments`; these safe-column views omit author/profile IDs, moderator IDs, and private object paths. Owner dashboard reads should use `owner_showcase_posts`, `owner_showcase_media`, `owner_comments`, and `owner_repair_status_history`. Their view predicates check the provisioned owner role. Do not grant direct base-table SELECT to anonymous users; the migration revokes it and relies on these bounded views. Customer-authenticated direct comment and repair-history reads are column-limited; RLS still permits only published approved comments plus that customer's own comments/history.
 

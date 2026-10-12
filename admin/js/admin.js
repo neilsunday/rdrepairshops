@@ -1057,8 +1057,12 @@
         downloadedCompletionBatchIds = [];
         progress.hidden = true;
         progressLabel.textContent = "";
-        status.textContent =
-          `Completion proof batches could not be loaded. Apply migrations 007 and 008, then refresh. ${error.message}`;
+        const ownerAccessDenied = error.message?.includes(
+          "Owner access is required to prepare completion reports",
+        );
+        status.textContent = ownerAccessDenied
+          ? `Your current Supabase session is not recognized as the provisioned owner. Verify that the signed-in Auth user has the owner role in public.user_roles, then sign out and back in. ${error.message}`
+          : `Completion proof batches could not be loaded. Confirm migrations 007 and 008 were applied, then refresh. ${error.message}`;
         status.dataset.state = "error";
         download.disabled = true;
         authorize.hidden = true;

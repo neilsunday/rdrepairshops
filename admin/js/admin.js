@@ -2094,6 +2094,129 @@ ${reportItems}
       }
     };
 
+    const openRepairCompletionDialog = (record, trigger) => {
+      const dialog = makeElement("dialog", "record-editor completion-dialog");
+      dialog.setAttribute("aria-labelledby", "completion-dialog-title");
+      const form = makeElement("form", "record-editor__form completion-dialog__form");
+      const heading = makeElement("div", "completion-dialog__heading");
+      const headingCopy = document.createElement("div");
+      headingCopy.append(
+        makeElement("p", "panel-eyebrow", "CUSTOMER STATUS UPDATE"),
+        makeElement("h2", "", "Mark this repair as done?"),
+      );
+      headingCopy.querySelector("h2").id = "completion-dialog-title";
+      const close = makeElement("button", "icon-button completion-dialog__close", "×");
+      close.type = "button";
+      close.setAttribute("aria-label", "Close confirmation");
+      close.addEventListener("click", () => dialog.close());
+      heading.append(headingCopy, close);
+
+      const summary = makeElement("dl", "completion-dialog__summary");
+      [
+        ["Request", record.reference],
+        ["Customer", record.customerName],
+        ["Device", `${record.brand || ""} ${record.model || ""}`.trim()],
+        ["Service", record.serviceName],
+      ].forEach(([label, value]) => {
+        const item = makeElement("div", "completion-dialog__detail");
+        item.append(
+          makeElement("dt", "", label),
+          makeElement("dd", "", value || "Not provided"),
+        );
+        summary.append(item);
+      });
+
+      const notice = makeElement("div", "completion-dialog__notice");
+      notice.append(
+        makeElement("strong", "", "The customer will see:"),
+        makeElement(
+          "p",
+          "",
+          "Your repair is complete. Please contact the shop to arrange pickup.",
+        ),
+      );
+      const status = makeElement("p", "completion-dialog__status");
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      const actions = makeElement("div", "record-editor__actions");
+      const cancel = makeElement("button", "admin-button", "Keep in progress");
+      cancel.type = "button";
+      cancel.addEventListener("click", () => dialog.close());
+      const confirm = makeElement(
+        "button",
+        "admin-button admin-button--primary",
+        "Mark as done",
+      );
+      confirm.type = "submit";
+      actions.append(cancel, confirm);
+
+      form.append(heading, summary, notice, status, actions);
+      dialog.append(form);
+      document.body.append(dialog);
+      dialog.addEventListener(
+        "close",
+        () => {
+          dialog.remove();
+          if (trigger.isConnected) trigger.focus();
+        },
+        { once: true },
+      );
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (
+          ["completed", "cancelled"].includes(record.status) ||
+          confirm.disabled
+        )
+          return;
+        confirm.disabled = true;
+        cancel.disabled = true;
+        close.disabled = true;
+        confirm.textContent = "Saving completion…";
+        status.dataset.state = "loading";
+        status.textContent = "Updating repair status and customer dashboard…";
+        try {
+          await window.AdminDataAdapter.updateRepair(record.id, {
+            status: "completed",
+            customer_visible_note:
+              "Your repair is complete. Please contact the shop to arrange pickup.",
+          });
+          dialog.close();
+          showToast(
+            `Repair ${record.reference} marked done. The customer dashboard will show the completed status.`,
+          );
+          try {
+            const proofCount =
+              await window.AdminDataAdapter.getCompletionProofCount();
+            if (proofCount >= 10 && proofCount % 10 === 0)
+              showToast(
+                `Milestone reached: ${proofCount} repairs are completed. Open Completed Notes to download the proof report.`,
+              );
+          } catch (error) {
+            console.error(
+              "Repair was marked done, but the proof milestone could not be checked:",
+              error,
+            );
+            showToast(
+              "Repair marked done, but the proof report status could not be refreshed.",
+              "error",
+            );
+          }
+          await loadModule(activeModule, activePage);
+        } catch (error) {
+          console.error("Repair completion update failed:", error);
+          status.dataset.state = "error";
+          status.textContent =
+            error.message || "The repair could not be marked done.";
+          confirm.disabled = false;
+          cancel.disabled = false;
+          close.disabled = false;
+          confirm.textContent = "Mark as done";
+        }
+      });
+      dialog.showModal();
+      confirm.focus();
+    };
+
     navItems.forEach((item) =>
       item.addEventListener("click", () => loadModule(item.dataset.viewTarget)),
     );
@@ -2309,50 +2432,10 @@ ${reportItems}
         if (
           !record ||
           ["completed", "cancelled"].includes(record.status) ||
-          !window.confirm(
-            `Mark repair ${record.reference} as done? The customer will see this update in their repair dashboard.`,
-          )
+          !isProduction()
         )
           return;
-        recordAction.disabled = true;
-        recordAction.textContent = "Saving…";
-        window.AdminDataAdapter.updateRepair(record.id, {
-          status: "completed",
-          customer_visible_note:
-            "Your repair is complete. Please contact the shop to arrange pickup.",
-        })
-          .then(async () => {
-            showToast(
-              `Repair ${record.reference} marked done. The customer dashboard will show the completed status.`,
-            );
-            try {
-              const proofCount =
-                await window.AdminDataAdapter.getCompletionProofCount();
-              if (proofCount >= 10 && proofCount % 10 === 0)
-                showToast(
-                  `Milestone reached: ${proofCount} repairs are completed. Open Completed Notes to download the proof report.`,
-                );
-            } catch (error) {
-              console.error(
-                "Repair was marked done, but the proof milestone could not be checked:",
-                error,
-              );
-              showToast(
-                "Repair marked done, but the proof report status could not be refreshed.",
-                "error",
-              );
-            }
-            return loadModule(activeModule, activePage);
-          })
-          .catch((error) => {
-            console.error("Repair completion update failed:", error);
-            showToast(
-              error.message || "The repair could not be marked done.",
-              "error",
-            );
-            recordAction.disabled = false;
-            recordAction.textContent = "Mark as done";
-          });
+        openRepairCompletionDialog(record, recordAction);
         return;
       }
       if (recordAction?.dataset.recordAction === "mark-read") {

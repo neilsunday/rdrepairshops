@@ -127,6 +127,89 @@ button {
   justify-content: flex-end;
   gap: 0.7rem;
 }
+.completion-dialog {
+  width: min(100% - 2rem, 560px);
+  max-height: min(88vh, 760px);
+}
+.completion-dialog::backdrop {
+  background: rgb(0 0 0 / 62%);
+  backdrop-filter: blur(2px);
+}
+.completion-dialog__form {
+  gap: 1rem;
+}
+.completion-dialog__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.completion-dialog__heading .panel-eyebrow {
+  margin-bottom: 0.35rem;
+}
+.completion-dialog__heading h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.completion-dialog__close {
+  flex: 0 0 auto;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.completion-dialog__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-page);
+}
+.completion-dialog__detail {
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+}
+.completion-dialog__detail:nth-child(even) {
+  border-left: 1px solid var(--admin-border);
+}
+.completion-dialog__detail:nth-child(n + 3) {
+  border-top: 1px solid var(--admin-border);
+}
+.completion-dialog__detail dt {
+  color: var(--admin-subtle);
+  font-size: 0.66rem;
+}
+.completion-dialog__detail dd {
+  margin: 0.2rem 0 0;
+  color: var(--admin-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.completion-dialog__notice {
+  padding: 0.85rem 0.95rem;
+  border-left: 3px solid #397b52;
+  background: var(--admin-surface-alt);
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+}
+.completion-dialog__notice strong {
+  color: var(--admin-text);
+}
+.completion-dialog__notice p {
+  margin-top: 0.25rem;
+}
+.completion-dialog__status {
+  min-height: 1.2rem;
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+}
+.completion-dialog__status[data-state="error"] {
+  color: #a83f3f;
+  font-weight: 600;
+}
+.completion-dialog__status[data-state="loading"] {
+  color: var(--admin-muted);
+}
 svg {
   display: block;
 }

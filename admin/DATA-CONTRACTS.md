@@ -4,7 +4,7 @@ This document describes the live owner dashboard and the Supabase records it con
 
 ## Adapter Boundary
 
-The UI consumes collections by stable module key and normalizes them to records shaped below. Both adapters return `{ mode, records, total, page, pageSize }`; the production adapter additionally reads overview metrics and business settings. Supported owner operations are repair request create/update, append-only internal notes, service create/update, client notebook entry create/update/delete, notification read state, and settings save. Repair showcase posts and comments remain part of the database contract for public-site compatibility, but are no longer managed from the admin dashboard. Customer directory and activity log entries are read-only. Do not put service-role credentials in browser code. Every query and mutation must be authorized by Supabase Auth and RLS; client-side visibility is not authorization.
+The UI consumes collections by stable module key and normalizes them to records shaped below. Both adapters return `{ mode, records, total, page, pageSize }`; the production adapter additionally reads overview metrics, business settings, and owner-only completion proof exports. Supported owner operations are repair request create/update, append-only internal notes, service create/update, client notebook entry create/update/delete, notification read state, and settings save. Repair showcase posts and comments remain part of the database contract for public-site compatibility, but are no longer managed from the admin dashboard. Customer directory and activity log entries are read-only. Do not put service-role credentials in browser code. Every query and mutation must be authorized by Supabase Auth and RLS; client-side visibility is not authorization.
 
 The dashboard deliberately has no repair-request deletion control, role assignment, Storage upload, or anonymous public repair intake. Customer request edit/delete is restricted to the authenticated customer in the client portal; customer deletion removes that request's photos, while owner work notes and status history are retained as snapshots. The lifecycle migration preserves owner select/insert/update access while denying owner DELETE through the authenticated API. Do not show a success state until the backend confirms the operation. UI states include loading, empty, error, filtered no-results, validation error, and operation success. Preview mode remains read-only.
 
@@ -22,7 +22,8 @@ The dashboard deliberately has no repair-request deletion control, role assignme
 - Status values: `submitted`, `inspecting`, `awaiting_approval`, `approved`, `in_progress`, `ready_for_pickup`, `completed`, `cancelled`.
 - Priority values: `low`, `normal`, `high`, `urgent`.
 - Keep customer-contact snapshots on a request so historical records remain understandable if a profile changes. Contact fields are private.
-- Migration `006_customer_repair_lifecycle.sql` allows customers to edit/delete only their own request. They cannot modify lifecycle status, assignment, reference, completion time, cleanup marker, or staff-authored updates. Completed requests and their private photos become eligible for cleanup 48 hours after completion. Owner notes and status history are retained with request-reference, client-name, and device snapshots when the request is deleted.
+- Migration `006_customer_repair_lifecycle.sql` allows customers to edit/delete only their own request. They cannot modify lifecycle status, assignment, reference, completion time, cleanup marker, or staff-authored updates. Migration `008_completion_proof_batches.sql` gates automatic request/photo cleanup on both the 48-hour minimum and owner download approval for a full batch of 10. Owner notes and status history are retained with request-reference, client-name, and device snapshots when the request is deleted.
+- Migration `007_repair_completion_proofs.sql` captures an owner-only completion snapshot with customer contact, device, requested concern, service, submission time, and completion time. Migration `008_completion_proof_batches.sql` groups snapshots by ten; the owner must download and explicitly approve cleanup before those requests become eligible for deletion at 48 hours. Groups with fewer than ten are retained and work notes/status history are preserved.
 - The owner dashboard work log reuses `repair_internal_notes` for timestamped service completion evidence (work performed, parts used, and checks completed). It is owner-only and must never be presented as a customer-visible update.
 
 ### Repair status history
@@ -41,6 +42,12 @@ The dashboard deliberately has no repair-request deletion control, role assignme
 - `id`, `repair_request_id`, private storage `object_path`, `uploaded_by`, `content_type`, `byte_size`, optional `alt_text`, `created_at`.
 - Repair attachments and object metadata are private to authorized owner/backend access; never treat a public bucket URL as access control.
 - Customer deletion removes own-request Storage objects before deleting the request. Scheduled cleanup uses the server-side `cleanup-completed-repairs` Edge Function and service role; deployment, Vault secret setup, and the `pg_cron` schedule are required (see `supabase/SETUP.md`).
+
+### Completion proof archive
+
+- `repair_completion_proofs`: owner-readable snapshots of completed repair identity, customer contact, device, concern, service, and submitted/completed timestamps. The request relation becomes null on request deletion; the snapshot remains.
+- The archive is populated by a database trigger and backfilled from completed requests present when migration `007_repair_completion_proofs.sql` runs. Browser clients have select-only owner access; direct insert, update, and delete are not granted.
+- The Admin Dashboard downloads a standalone styled HTML report after at least 10 archived completions. Associated owner work notes are included from `repair_internal_notes`; customer photos are intentionally excluded because retention cleanup removes them. After the report is saved and cleanup is explicitly approved, the temporary proof snapshots are deleted with their requests; the ten-count batch metadata and owner work notes/status history remain.
 
 ### Customers
 

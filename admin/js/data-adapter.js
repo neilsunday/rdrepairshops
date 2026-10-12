@@ -264,6 +264,24 @@
     async markNotificationRead() {
       throw new Error("Preview mode is read-only.");
     },
+    async listCompletionProofs() {
+      return {
+        mode: "preview",
+        records: [],
+        total: 0,
+        readyCount: 0,
+        waitingCount: 0,
+        batchIds: [],
+        approvedProofCount: 0,
+        approvedBatchCount: 0,
+      };
+    },
+    async getCompletionProofCount() {
+      return 0;
+    },
+    async authorizeCompletionProofCleanup() {
+      throw new Error("Preview mode is read-only.");
+    },
     async saveSettings() {
       throw new Error("Preview mode is read-only.");
     },
@@ -630,6 +648,185 @@
         .select("id,created_at,created_by")
         .single();
       if (error) throw databaseError("Internal note could not be saved", error);
+      return data;
+    },
+    async listCompletionProofs() {
+      const client = await window.AdminSupabaseClient.get();
+      const { error: stageError } = await client.rpc(
+        "stage_ready_completion_proof_batches",
+      );
+      if (stageError)
+        throw databaseError("Ready completion batches could not be prepared", stageError);
+
+      const [
+        { data: batches, error: batchError },
+        { count: waitingCount, error: waitingError },
+        { data: approvedBatches, error: approvedBatchError },
+      ] =
+        await Promise.all([
+          client
+            .from("repair_completion_batches")
+            .select("id,batch_number")
+            .is("cleanup_authorized_at", null)
+            .order("batch_number", { ascending: true }),
+          client
+            .from("repair_completion_proofs")
+            .select("id", { count: "exact", head: true })
+            .is("batch_id", null),
+          client
+            .from("repair_completion_batches")
+            .select("id")
+            .not("cleanup_authorized_at", "is", null),
+        ]);
+      if (batchError || waitingError || approvedBatchError)
+        throw databaseError(
+          "Completion batch status could not be loaded",
+          batchError || waitingError || approvedBatchError,
+        );
+
+      const batchIds = (batches || []).map((batch) => batch.id);
+      const approvedBatchIds = (approvedBatches || []).map((batch) => batch.id);
+      const { count: approvedProofCount, error: approvedProofError } =
+        approvedBatchIds.length
+          ? await client
+              .from("repair_completion_proofs")
+              .select("id", { count: "exact", head: true })
+              .in("batch_id", approvedBatchIds)
+          : { count: 0, error: null };
+      if (approvedProofError)
+        throw databaseError(
+          "Approved cleanup progress could not be loaded",
+          approvedProofError,
+        );
+
+      const { data: proofs, error: proofError } = batchIds.length
+        ? await client
+            .from("repair_completion_proofs")
+            .select(
+              "id,repair_request_id,reference_number,customer_name,customer_email,customer_phone,device_type,brand,model,reported_issue,service_name,submitted_at,completed_at,batch_id",
+            )
+            .in("batch_id", batchIds)
+            .order("completed_at", { ascending: true })
+        : { data: [], error: null };
+      if (proofError)
+        throw databaseError("Completion proof records could not be loaded", proofError);
+      const proofsById = new Map((batches || []).map((batch) => [batch.id, batch]));
+      const readyProofs = (proofs || []).map((proof) => ({
+        ...proof,
+        batchNumber: proofsById.get(proof.batch_id)?.batch_number,
+      }));
+
+      const references = readyProofs.map((proof) => proof.reference_number);
+      const repairIds = readyProofs
+        .map((proof) => proof.repair_request_id)
+        .filter(Boolean);
+      const noteRows = [];
+      const loadNotes = async (column, values) => {
+        for (let offset = 0; offset < values.length; offset += 100) {
+          const { data, error } = await client
+            .from("repair_internal_notes")
+            .select(
+              "id,repair_request_id,repair_reference_snapshot,note,created_at,created_by",
+            )
+            .in(column, values.slice(offset, offset + 100));
+          if (error)
+            throw databaseError("Completion proof work notes could not be loaded", error);
+          noteRows.push(...(data || []));
+        }
+      };
+      await Promise.all([
+        loadNotes("repair_request_id", repairIds),
+        loadNotes("repair_reference_snapshot", references),
+      ]);
+      const notesByReference = new Map();
+      const proofByRepairId = new Map(
+        readyProofs
+          .filter((proof) => proof.repair_request_id)
+          .map((proof) => [proof.repair_request_id, proof]),
+      );
+      const seenNotes = new Set();
+      for (const note of noteRows) {
+        if (seenNotes.has(note.id)) continue;
+        seenNotes.add(note.id);
+        const proof = proofByRepairId.get(note.repair_request_id);
+        const reference =
+          proof?.reference_number || note.repair_reference_snapshot;
+        if (!reference) continue;
+        notesByReference.set(reference, [
+          ...(notesByReference.get(reference) || []),
+          note,
+        ]);
+      }
+
+      const authorIds = [
+        ...new Set(noteRows.map((note) => note.created_by).filter(Boolean)),
+      ];
+      const { data: authors, error: authorError } = authorIds.length
+        ? await client
+            .from("profiles")
+            .select("id,display_name")
+            .in("id", authorIds)
+        : { data: [], error: null };
+      if (authorError)
+        throw databaseError("Completion proof note authors could not be loaded", authorError);
+      const authorNames = new Map(
+        (authors || []).map((author) => [author.id, author.display_name]),
+      );
+
+      return {
+        mode: "production",
+        records: readyProofs.map((proof) => ({
+          ...proof,
+          workNotes: (notesByReference.get(proof.reference_number) || [])
+            .sort(
+              (left, right) =>
+                Date.parse(left.created_at) - Date.parse(right.created_at),
+            )
+            .map((note) => ({
+              note: note.note,
+              createdAt: note.created_at,
+              author: authorNames.get(note.created_by) || "Owner",
+            })),
+        })),
+        readyCount: readyProofs.length,
+        waitingCount: waitingCount || 0,
+        batchIds,
+        approvedProofCount: approvedProofCount || 0,
+        approvedBatchCount: approvedBatchIds.length,
+      };
+    },
+    async getCompletionProofCount() {
+      const client = await window.AdminSupabaseClient.get();
+      const [
+        { count: batchCount, error: batchError },
+        { count: unbatchedCount, error: unbatchedError },
+      ] = await Promise.all([
+        client
+          .from("repair_completion_batches")
+          .select("id", { count: "exact", head: true }),
+        client
+          .from("repair_completion_proofs")
+          .select("id", { count: "exact", head: true })
+          .is("batch_id", null),
+      ]);
+      if (batchError || unbatchedError)
+        throw databaseError(
+          "Completion proof count could not be loaded",
+          batchError || unbatchedError,
+        );
+      return (batchCount || 0) * 10 + (unbatchedCount || 0);
+    },
+    async authorizeCompletionProofCleanup(batchIds) {
+      const client = await window.AdminSupabaseClient.get();
+      const { data, error } = await client.rpc(
+        "authorize_completion_proof_cleanup",
+        { p_batch_ids: batchIds },
+      );
+      if (error)
+        throw databaseError(
+          "Completion proof cleanup could not be authorized",
+          error,
+        );
       return data;
     },
     async createService(payload) {

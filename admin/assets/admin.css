@@ -1200,6 +1200,70 @@ ol {
   border-color: var(--admin-border-strong);
   color: var(--admin-text);
 }
+.completion-proof-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem 1.5rem;
+  margin: 1rem 0;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border: 1px solid var(--admin-border-strong);
+  border-left: 4px solid #397b52;
+  background:
+    linear-gradient(115deg, rgb(57 123 82 / 8%), transparent 58%),
+    var(--admin-surface);
+}
+.completion-proof-panel__copy {
+  grid-column: 1 / -1;
+}
+.completion-proof-panel__copy h2 {
+  margin: 0.2rem 0;
+  font-size: 1.08rem;
+  letter-spacing: -0.02em;
+}
+.completion-proof-panel__copy .panel-note {
+  max-width: 690px;
+  margin: 0.35rem 0 0;
+}
+.completion-proof-panel__progress {
+  width: min(100%, 430px);
+  height: 0.6rem;
+  accent-color: #397b52;
+}
+.completion-proof-panel__progress-label,
+.completion-proof-panel__status {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 0.74rem;
+}
+.completion-proof-panel__progress-label {
+  grid-column: 1 / -1;
+}
+.completion-proof-panel__status {
+  align-self: center;
+}
+.completion-proof-panel__status[data-state="ready"] {
+  color: color-mix(in srgb, #397b52 55%, var(--admin-text));
+  font-weight: 600;
+}
+.completion-proof-panel__status[data-state="error"] {
+  color: #a83f3f;
+}
+.completion-proof-panel__download {
+  grid-column: 2;
+  grid-row: 3 / span 2;
+}
+.completion-proof-panel__authorize {
+  grid-column: 2;
+  grid-row: 5;
+}
+.completion-proof-panel [hidden] {
+  display: none;
+}
+.completion-proof-panel__download:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
 .notification-card__action {
   flex: 0 0 auto;
   align-self: center;
@@ -1424,6 +1488,22 @@ ol {
 }
 
 @media (max-width: 620px) {
+  .completion-proof-panel {
+    grid-template-columns: 1fr;
+  }
+  .completion-proof-panel__copy,
+  .completion-proof-panel__progress-label,
+  .completion-proof-panel__download {
+    grid-column: 1;
+  }
+  .completion-proof-panel__download {
+    grid-row: auto;
+    width: 100%;
+  }
+  .completion-proof-panel__authorize {
+    grid-row: auto;
+    width: 100%;
+  }
   .record-editor {
     width: calc(100% - 1rem);
     max-height: 94vh;

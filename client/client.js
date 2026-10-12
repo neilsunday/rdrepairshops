@@ -671,8 +671,8 @@
           "p",
           "repair-retention",
           cleanupTime > Date.now()
-            ? `This completed request and its photos are scheduled for automatic deletion after ${formatDate(new Date(cleanupTime).toISOString())}.`
-            : "This completed request is scheduled for automatic deletion. You can still remove it now.",
+            ? `Eligible for cleanup after ${formatDate(new Date(cleanupTime).toISOString())}, once the owner has downloaded and approved a 10-repair proof batch.`
+            : "Past the 2-day minimum retention. Cleanup still waits for a full 10-repair proof batch and owner download approval.",
         );
         article.append(retention);
       }

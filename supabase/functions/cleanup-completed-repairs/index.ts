@@ -49,50 +49,66 @@ Deno.serve(async (request) => {
   let deleted = 0;
   let failed = 0;
   for (const repair of requests || []) {
-    const { data: attachments, error: attachmentError } = await supabase
-      .from("repair_attachments")
-      .select("object_path")
-      .eq("repair_request_id", repair.id);
-    if (attachmentError) {
-      console.error(
-        `Could not list photos for completed repair ${repair.reference_number}:`,
-        attachmentError,
-      );
-      failed += 1;
-      continue;
-    }
-
-    const paths = (attachments || []).map((attachment) => attachment.object_path);
-    if (paths.length) {
-      const { error: storageError } = await supabase
-        .storage
-        .from("repair-attachments")
-        .remove(paths);
-      if (storageError) {
+    if (repair.repair_request_id) {
+      const { data: attachments, error: attachmentError } = await supabase
+        .from("repair_attachments")
+        .select("object_path")
+        .eq("repair_request_id", repair.repair_request_id);
+      if (attachmentError) {
         console.error(
-          `Could not remove photos for completed repair ${repair.reference_number}:`,
-          storageError,
+          `Could not list photos for completed repair ${repair.reference_number}:`,
+          attachmentError,
+        );
+        failed += 1;
+        continue;
+      }
+
+      const paths = (attachments || []).map((attachment) => attachment.object_path);
+      if (paths.length) {
+        const { error: storageError } = await supabase
+          .storage
+          .from("repair-attachments")
+          .remove(paths);
+        if (storageError) {
+          console.error(
+            `Could not remove photos for completed repair ${repair.reference_number}:`,
+            storageError,
+          );
+          failed += 1;
+          continue;
+        }
+      }
+
+      const { data: removed, error: deleteError } = await supabase
+        .from("repair_requests")
+        .delete()
+        .eq("id", repair.repair_request_id)
+        .eq("status", "completed")
+        .not("retention_cleanup_started_at", "is", null)
+        .select("id");
+      if (deleteError || !removed?.length) {
+        console.error(
+          `Could not delete completed repair ${repair.reference_number}:`,
+          deleteError || "The request no longer matched the cleanup criteria.",
         );
         failed += 1;
         continue;
       }
     }
 
-    const { data: removed, error: deleteError } = await supabase
-      .from("repair_requests")
+    const { error: proofDeleteError } = await supabase
+      .from("repair_completion_proofs")
       .delete()
-      .eq("id", repair.id)
-      .eq("status", "completed")
-      .not("retention_cleanup_started_at", "is", null)
-      .select("id");
-    if (deleteError || !removed?.length) {
+      .eq("id", repair.proof_id);
+    if (proofDeleteError) {
       console.error(
-        `Could not delete completed repair ${repair.reference_number}:`,
-        deleteError || "The request no longer matched the cleanup criteria.",
+        `Could not remove archived proof for completed repair ${repair.reference_number}:`,
+        proofDeleteError,
       );
       failed += 1;
       continue;
     }
+
     deleted += 1;
   }
 

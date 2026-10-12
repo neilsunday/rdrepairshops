@@ -355,6 +355,8 @@
     let activePage = 0;
     let activeTotal = 0;
     let currentUserId = null;
+    let completionProofRecords = [];
+    let downloadedCompletionBatchIds = [];
     const moduleQueryState = new Map();
     let searchTimer;
     let toastTimer;
@@ -982,6 +984,201 @@
       return panel;
     };
 
+    const createCompletionProofPanel = () => {
+      const panel = makeElement("section", "panel completion-proof-panel");
+      panel.setAttribute("aria-labelledby", "completion-proof-title");
+      const copy = makeElement("div", "completion-proof-panel__copy");
+      const title = makeElement("h2", "", "Completed repair proof pack");
+      title.id = "completion-proof-title";
+      copy.append(
+        makeElement("p", "panel-eyebrow", "SERVICE MILESTONE"),
+        title,
+        makeElement(
+          "p",
+          "panel-note",
+          "Keep a polished, downloadable record of who came in, what concern was repaired, when it was completed, and the owner-only work notes.",
+        ),
+      );
+      const progress = document.createElement("progress");
+      progress.className = "completion-proof-panel__progress";
+      progress.max = 10;
+      progress.value = 0;
+      progress.setAttribute(
+        "aria-label",
+        "Completed repairs toward the ten-repair download milestone",
+      );
+      const progressLabel = makeElement(
+        "p",
+        "completion-proof-panel__progress-label",
+        "",
+      );
+      progressLabel.dataset.proofProgress = "true";
+      const status = makeElement(
+        "p",
+        "completion-proof-panel__status",
+        "Loading saved completion records…",
+      );
+      status.dataset.proofStatus = "true";
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      const download = makeElement(
+        "button",
+        "admin-button admin-button--primary completion-proof-panel__download",
+        "Download proof report",
+      );
+      download.type = "button";
+      download.disabled = true;
+      download.dataset.downloadCompletionProofs = "true";
+      const authorize = makeElement(
+        "button",
+        "admin-button completion-proof-panel__authorize",
+        "I saved the report — approve cleanup",
+      );
+      authorize.type = "button";
+      authorize.hidden = true;
+      authorize.disabled = true;
+      authorize.dataset.authorizeCompletionCleanup = "true";
+      panel.append(copy, progress, progressLabel, status, download, authorize);
+      return panel;
+    };
+
+    const renderCompletionProofPanel = (result, error = null) => {
+      const panel = host.querySelector(".completion-proof-panel");
+      if (!panel) return;
+      const progress = panel.querySelector("progress");
+      const progressLabel = panel.querySelector("[data-proof-progress]");
+      const status = panel.querySelector("[data-proof-status]");
+      const download = panel.querySelector("[data-download-completion-proofs]");
+      const authorize = panel.querySelector(
+        "[data-authorize-completion-cleanup]",
+      );
+      if (error) {
+        completionProofRecords = [];
+        downloadedCompletionBatchIds = [];
+        progress.hidden = true;
+        progressLabel.textContent = "";
+        status.textContent =
+          `Completion proof batches could not be loaded. Apply migrations 007 and 008, then refresh. ${error.message}`;
+        status.dataset.state = "error";
+        download.disabled = true;
+        authorize.hidden = true;
+        authorize.disabled = true;
+        return;
+      }
+      completionProofRecords = result.records;
+      downloadedCompletionBatchIds = [];
+      const readyCount = result.readyCount;
+      const waitingCount = result.waitingCount;
+      const approvedProofCount = result.approvedProofCount;
+      const hasReadyBatch = readyCount >= 10 && result.batchIds.length > 0;
+      download.disabled = !isProduction() || !hasReadyBatch;
+      progress.hidden = !isProduction();
+      progress.value = Math.min(waitingCount, 10);
+      progressLabel.textContent = isProduction()
+        ? waitingCount
+          ? `${Math.min(waitingCount, 10)} of 10 toward the next report batch`
+          : hasReadyBatch
+            ? "Full batch ready; remaining repairs will start the next group."
+            : "0 of 10 toward the next report batch"
+        : "Live completion records are available in the connected owner dashboard.";
+      status.dataset.state = hasReadyBatch ? "ready" : "waiting";
+      status.textContent = !isProduction()
+        ? "Demo preview does not contain customer proof records."
+        : hasReadyBatch
+          ? `${readyCount} completed repairs are ready in ${result.batchIds.length} full batch${result.batchIds.length === 1 ? "" : "es"}. Download and save the report, then approve cleanup.`
+          : approvedProofCount
+            ? `${approvedProofCount} repair${approvedProofCount === 1 ? "" : "s"} in downloaded batches are waiting for their 48-hour minimum and automatic cleanup.`
+          : approvedProofCount === 0 && (result.approvedBatchCount || 0) > 0
+            ? "All approved batches have been cleaned up. Owner work notes and status history remain available."
+            : `${waitingCount} of 10 completed repairs recorded. Nothing will be automatically deleted until a full batch is downloaded and approved.`;
+      download.textContent = hasReadyBatch
+        ? `Download ${readyCount} proof records`
+        : `Download unlocks at 10 (${waitingCount}/10)`;
+      authorize.hidden = true;
+      authorize.disabled = true;
+      authorize.textContent = "I saved the report — approve cleanup";
+    };
+
+    const escapeReportHtml = (value) =>
+      String(value ?? "").replace(/[&<>"']/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character]);
+
+    const formatReportDate = (value) => {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime())
+        ? "Not available"
+        : new Intl.DateTimeFormat("en-PH", {
+            dateStyle: "medium",
+            timeStyle: "short",
+            timeZone: "Asia/Manila",
+          }).format(date);
+    };
+
+    const downloadCompletionProofReport = (records) => {
+      if (records.length < 10) {
+        showToast("The proof report unlocks after 10 repairs are completed.", "error");
+        return false;
+      }
+      const generatedAt = formatReportDate(new Date().toISOString());
+      const reportItems = records
+        .map((record) => {
+          const notes = record.workNotes.length
+            ? record.workNotes
+                .map(
+                  (entry) => `<li>
+                    <div class="note-meta"><strong>${escapeReportHtml(entry.author)}</strong><time>${escapeReportHtml(formatReportDate(entry.createdAt))}</time></div>
+                    <p>${escapeReportHtml(entry.note)}</p>
+                  </li>`,
+                )
+                .join("")
+            : '<li class="empty-note">No owner work note was recorded for this repair.</li>';
+          const contact = [record.customer_email, record.customer_phone]
+            .filter(Boolean)
+            .map(escapeReportHtml)
+            .join(" · ");
+          return `<article class="repair-proof">
+            <header><div><p class="eyebrow">COMPLETED REPAIR</p><h2>${escapeReportHtml(record.reference_number)}</h2></div><time>${escapeReportHtml(formatReportDate(record.completed_at))}</time></header>
+            <div class="facts">
+              <div><span>Customer</span><strong>${escapeReportHtml(record.customer_name)}</strong><small>${contact || "No contact details saved"}</small></div>
+              <div><span>Device</span><strong>${escapeReportHtml([record.brand, record.model].filter(Boolean).join(" ") || record.device_type)}</strong><small>${escapeReportHtml(record.device_type)}</small></div>
+              <div><span>Service</span><strong>${escapeReportHtml(record.service_name)}</strong></div>
+              <div><span>Request received</span><strong>${escapeReportHtml(formatReportDate(record.submitted_at))}</strong></div>
+            </div>
+            <section class="concern"><h3>Customer concern</h3><p>${escapeReportHtml(record.reported_issue)}</p></section>
+            <section class="proof-notes"><h3>Service work & proof notes</h3><ol>${notes}</ol></section>
+          </article>`;
+        })
+        .join("");
+      const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>R&amp;D Cellphone Repair — Completion Proof Report</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f5f3;color:#1e2622;font:15px/1.55 Arial,sans-serif}.report{max-width:900px;margin:0 auto;padding:40px 24px}.masthead{padding:28px 32px;background:#173b31;color:#fff;border-radius:14px}.brand{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#c6ddd2}.masthead h1{margin:8px 0;font-size:clamp(24px,5vw,38px);line-height:1.15}.masthead p{margin:0;color:#d6e5de}.summary{display:flex;justify-content:space-between;gap:16px;margin:18px 0 26px;padding:18px 22px;background:#fff;border:1px solid #dce3df;border-radius:10px}.summary strong{font-size:24px;color:#173b31}.summary small{display:block;color:#637169}.repair-proof{break-inside:avoid;margin:18px 0;padding:24px;background:#fff;border:1px solid #dce3df;border-radius:12px;box-shadow:0 4px 14px #1e26220b}.repair-proof header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:14px;border-bottom:1px solid #e6ebe8}.repair-proof header time{color:#52635a;font-size:13px}.eyebrow{margin:0;color:#527669;font-size:10px;font-weight:bold;letter-spacing:.14em}.repair-proof h2{margin:3px 0;font-size:21px}.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}.facts div{min-width:0}.facts span,.facts small{display:block;color:#647269;font-size:12px}.facts strong{display:block;margin-top:3px;overflow-wrap:anywhere}.concern,.proof-notes{margin-top:18px}.concern h3,.proof-notes h3{margin:0 0 8px;font-size:14px}.concern p,.proof-notes li p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.proof-notes ol{display:grid;gap:9px;margin:0;padding:0;list-style:none}.proof-notes li{padding:12px 14px;background:#f5f7f5;border-radius:8px}.note-meta{display:flex;justify-content:space-between;gap:12px;margin-bottom:5px;color:#637169;font-size:12px}.note-meta strong{color:#33473c}.empty-note{color:#637169;font-style:italic}.actions{display:flex;justify-content:flex-end;margin:18px 0}.print-button{padding:10px 15px;border:0;border-radius:6px;background:#173b31;color:white;font-weight:bold;cursor:pointer}@media(max-width:560px){.report{padding:18px 12px}.masthead{padding:22px}.repair-proof{padding:18px}.facts{grid-template-columns:1fr}.summary{align-items:flex-start;flex-direction:column}}@media print{body{background:#fff}.report{max-width:none;padding:0}.masthead{background:#173b31!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}.repair-proof{box-shadow:none;border-color:#ccd5d0}.actions{display:none}.repair-proof{page-break-inside:avoid}}
+</style></head><body><main class="report">
+<header class="masthead"><p class="brand">R&amp;D Cellphone Repair</p><h1>Service Completion Proof Report</h1><p>Completed customer repairs with service details and owner-recorded proof notes.</p></header>
+<section class="summary"><div><strong>${records.length}</strong><small>completed repair records</small></div><div><strong>${escapeReportHtml(generatedAt)}</strong><small>report generated · Philippine time</small></div></section>
+<div class="actions"><button class="print-button" type="button" onclick="window.print()">Print / Save as PDF</button></div>
+${reportItems}
+<footer><small>Private owner business record · Generated from the connected Supabase project.</small></footer>
+</main></body></html>`;
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `repair-completion-proofs-${new Date().toISOString().slice(0, 10)}.html`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast(`Downloaded the report containing ${records.length} completion proofs.`);
+      return true;
+    };
+
     const renderModuleShell = (moduleKey) => {
       const definition = moduleDefinitions[moduleKey];
       const view = makeElement("section", "admin-view module-view");
@@ -1001,6 +1198,7 @@
         );
       } else {
         view.append(makeDataPanel(definition));
+        if (moduleKey === "notes") view.append(createCompletionProofPanel());
         if (moduleKey === "repairs" || moduleKey === "notes") {
           const detail = makeElement("section", "panel repair-detail-panel");
           detail.dataset.repairDetails = "true";
@@ -1354,6 +1552,17 @@
           activeRecords = result.records;
           activeTotal = result.total;
           renderFilteredTable(moduleKey);
+          if (moduleKey === "notes") {
+            try {
+              const proofs = await window.AdminDataAdapter.listCompletionProofs();
+              if (loadId !== moduleLoadId) return;
+              renderCompletionProofPanel(proofs);
+            } catch (error) {
+              if (loadId !== moduleLoadId) return;
+              console.error("Completion proof report could not be loaded:", error);
+              renderCompletionProofPanel(null, error);
+            }
+          }
         }
       } catch (error) {
         if (loadId !== moduleLoadId) return;
@@ -1845,6 +2054,67 @@
       }
     });
     host.addEventListener("click", (event) => {
+      const downloadProofs = event.target.closest(
+        "[data-download-completion-proofs]",
+      );
+      if (downloadProofs && activeModule === "notes") {
+        if (downloadCompletionProofReport(completionProofRecords)) {
+          downloadedCompletionBatchIds = [
+            ...new Set(
+              completionProofRecords
+                .map((proof) => proof.batch_id)
+                .filter(Boolean),
+            ),
+          ];
+          const authorize = host.querySelector(
+            "[data-authorize-completion-cleanup]",
+          );
+          if (authorize && downloadedCompletionBatchIds.length) {
+            authorize.hidden = false;
+            authorize.disabled = false;
+            showToast(
+              "Report downloaded. Review and save it, then approve cleanup to allow eligible records to be deleted.",
+            );
+          }
+        }
+        return;
+      }
+      const authorizeCleanup = event.target.closest(
+        "[data-authorize-completion-cleanup]",
+      );
+      if (authorizeCleanup && activeModule === "notes") {
+        if (
+          !downloadedCompletionBatchIds.length ||
+          !window.confirm(
+            "Confirm you saved the downloaded report. This approves deletion of these 10-record batches after each repair has been completed for at least 2 days. Owner work notes and status history will remain.",
+          )
+        )
+          return;
+        authorizeCleanup.disabled = true;
+        authorizeCleanup.textContent = "Approving cleanup…";
+        window.AdminDataAdapter.authorizeCompletionProofCleanup(
+          downloadedCompletionBatchIds,
+        )
+          .then(() => {
+            downloadedCompletionBatchIds = [];
+            showToast(
+              "Report saved and cleanup approved. Requests and photos will be removed only after their 2-day retention period.",
+            );
+            return loadModule("notes", activePage);
+          })
+          .catch((error) => {
+            console.error("Completion cleanup authorization failed:", error);
+            showToast(
+              error.message ||
+                "Cleanup could not be approved. The records have not been deleted.",
+              "error",
+            );
+            authorizeCleanup.disabled = false;
+            authorizeCleanup.textContent =
+              "I saved the report — approve cleanup";
+          });
+        return;
+      }
       const navigation = event.target.closest("[data-view-target]");
       if (navigation) {
         loadModule(navigation.dataset.viewTarget);
@@ -1937,10 +2207,27 @@
           customer_visible_note:
             "Your repair is complete. Please contact the shop to arrange pickup.",
         })
-          .then(() => {
+          .then(async () => {
             showToast(
               `Repair ${record.reference} marked done. The customer dashboard will show the completed status.`,
             );
+            try {
+              const proofCount =
+                await window.AdminDataAdapter.getCompletionProofCount();
+              if (proofCount >= 10 && proofCount % 10 === 0)
+                showToast(
+                  `Milestone reached: ${proofCount} repairs are completed. Open Completed Notes to download the proof report.`,
+                );
+            } catch (error) {
+              console.error(
+                "Repair was marked done, but the proof milestone could not be checked:",
+                error,
+              );
+              showToast(
+                "Repair marked done, but the proof report status could not be refreshed.",
+                "error",
+              );
+            }
             return loadModule(activeModule, activePage);
           })
           .catch((error) => {

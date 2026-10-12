@@ -307,11 +307,6 @@
   font-size: 0.78rem;
 }
 
-.client-footer a {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
 @media (max-width: 620px) {
   .client-header {
     min-height: 66px;

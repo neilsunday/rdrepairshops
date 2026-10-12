@@ -9,6 +9,36 @@
       content="Book a cellphone repair and track your repair requests."
     />
     <title>My Repairs | R&amp;D Cellphone Repair</title>
+    <script>
+      (() => {
+        const root = document.documentElement;
+        const storageKey = "rd-cellphone-repair-theme";
+        const setTheme = (theme) => {
+          root.setAttribute("data-theme", theme);
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute("content", theme === "dark" ? "#171717" : "#f7f7f5");
+        };
+        const savedTheme = () => {
+          try {
+            const value = localStorage.getItem(storageKey);
+            return value === "light" || value === "dark" ? value : null;
+          } catch {
+            return null;
+          }
+        };
+        const preferredTheme = () =>
+          savedTheme() ||
+          (window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light");
+
+        setTheme(preferredTheme());
+        window.addEventListener("storage", (event) => {
+          if (event.key === storageKey) setTheme(preferredTheme());
+        });
+      })();
+    </script>
     <link rel="stylesheet" href="../styles.css" />
     <link rel="stylesheet" href="./client.css" />
     <script src="../admin/js/supabase-config.js"></script>
@@ -184,7 +214,6 @@
         </section>
       </section>
       <footer class="client-footer">
-        <a href="../admin/login/">Owner sign in</a>
         <span>Private customer portal · R&amp;D Cellphone Repair</span>
       </footer>
     </main>

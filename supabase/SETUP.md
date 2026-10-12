@@ -6,7 +6,7 @@ The repository contains Supabase migrations and an owner dashboard configured to
 
 The default dashboard uses Supabase Auth and the authenticated browser client. Owner authorization and row access must continue to be enforced by RLS; a service-role key must never be placed in browser code. The `?preview=1` dashboard is still isolated, synthetic, and read-only.
 
-The dashboard supports owner reads and writes for repair requests, services, notebook entries, notification read state, work notes, and business settings. Customer-directory and activity entries are read-only. The customer portal supports authenticated repair intake and private repair photos after migrations `001` through `003` are applied. Migration `004` exposes only approved public business contact fields to the public website. Migration `005` creates the private owner notebook. Anonymous repair intake and showcase media upload are not supported.
+The dashboard supports owner reads and writes for repair requests, services, notebook entries, notification read state, work notes, and business settings. Customer-directory and activity entries are read-only. The customer portal supports authenticated repair intake and private repair photos after migrations `001` through `003` are applied. Migration `004` exposes only approved public business contact fields to the public website. Migration `005` creates the private owner notebook. Migration `006` lets customers edit or delete their own requests and adds the two-day completed-request/photo cleanup workflow. Anonymous repair intake and showcase media upload are not supported.
 
 ## Migration Order
 
@@ -18,7 +18,9 @@ The dashboard supports owner reads and writes for repair requests, services, not
 6. Apply `migrations/003_customer_repair_booking.sql` after confirming `001` and `002` are installed. It configures the private repair-photo bucket and scoped customer/owner policies; database table RLS alone does not authorize Storage objects.
 7. Apply `migrations/004_public_business_profile.sql` after confirming `001` is installed. It creates only the allowlisted public profile view; it does not write to owner-protected settings.
 8. Apply `migrations/005_client_notebook.sql` after `001` to add the owner-only client notebook. It does not insert sample entries.
-9. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
+9. Apply `migrations/006_customer_repair_lifecycle.sql` only after `001` through `003` are applied. It changes request delete policies, preserves snapshots in owner notes/history, and installs the cleanup-claim RPC.
+10. Deploy and schedule the cleanup Edge Function as documented below before relying on automatic deletion.
+11. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
 
 ## Exact ordered manual checklist
 
@@ -36,7 +38,21 @@ The dashboard supports owner reads and writes for repair requests, services, not
    - Only after `001` and `002` are confirmed, run `supabase/migrations/003_customer_repair_booking.sql`. It configures private `repair-attachments` Storage access and enforces the customer photo limits.
    - Run `supabase/migrations/004_public_business_profile.sql` after `001`. This enables public profile synchronization without granting access to or writing to the owner-only settings table.
    - Run `supabase/migrations/005_client_notebook.sql` after `001`. This creates owner-only storage for client purchases, repairs, services, and general notes.
+   - Run `supabase/migrations/006_customer_repair_lifecycle.sql` after `001` through `003`. Customers can edit/delete only their own repair requests; completion data and owner history snapshots are retained separately.
    - Do not run the SQL in a different order or with destructive resets.
+
+## Completed repair retention
+
+Migration `006_customer_repair_lifecycle.sql` records when a request becomes completed. Requests completed at least 48 hours ago are eligible for deletion, including their private Storage photos. Existing completed requests use `updated_at` (or `submitted_at`/current time as a fallback) as an estimate because no earlier completion timestamp exists. The request row and photo metadata are deleted; repair status history and owner internal notes remain with reference/client/device snapshots.
+
+The migration does not schedule its own recurring job. To enable automatic cleanup:
+
+1. From the repository root, deploy `supabase/functions/cleanup-completed-repairs/index.ts` with `supabase functions deploy cleanup-completed-repairs`. Keep JWT verification enabled; it authenticates the service-role bearer token and reads the service-role key only from Edge Function secrets.
+2. In Supabase Vault, create a secret named `repair_cleanup_service_role_key` containing the project's service-role key. Never put that key in browser code or commit it.
+3. Confirm `pg_cron`, `pg_net`, and Vault are enabled, replace `<PROJECT_REF>` in `supabase/schedule_repair_cleanup.sql`, then run the SQL once. It invokes cleanup every 15 minutes.
+4. Check the Edge Function logs and `cron.job_run_details` after an eligible repair exists. The endpoint reports claimed, deleted, and failed counts; failures are logged and can be retried by later runs.
+
+Customers can edit or permanently delete their own requests while the rows exist. The migration replaces the owner `FOR ALL` policy with owner select/insert/update policies, so the added table-level DELETE grant does not also grant authenticated owners permission to delete requests.
 
 4. Create or invite the owner Auth account.
    - Use the dashboard user management screen and the business-approved owner email.
@@ -192,7 +208,7 @@ Policies are permissive within a command, so owner and self-row policies OR toge
 | `profiles`                       | No access                                                                                                                       | Select/update own profile display name and phone only; cross-customer rows and email/status changes denied                                                                         | Select/update profiles. Role assignment remains unavailable through the client API.                                                                             |
 | `user_roles`                     | No access                                                                                                                       | No access, including own role; insert/update/delete denied                                                                                                                         | Select roles only. Role changes require trusted SQL administration.                                                                                             |
 | `repair_services`                | Select active services only                                                                                                     | Select active services only; writes denied                                                                                                                                         | Select all and insert/update/delete through authenticated owner session                                                                                         |
-| `repair_requests`                | No access                                                                                                                       | Select own; insert own with server-forced initial state; revise own submitted/uninspected fields only; cross-customer access, status/priority/assignment edits, and deletes denied | Select/insert/update all. Delete is not granted; use cancelled status.                                                                                          |
+| `repair_requests`                | No access                                                                                                                       | Select own; insert own with server-forced initial state; revise own customer fields and delete own requests; cross-customer access and status/priority/assignment edits denied | Select/insert/update all; delete denied.                                                                                                                          |
 | `repair_status_history`          | No access                                                                                                                       | Select only own request history and customer-facing columns; `changed_by` is hidden. Direct insert/update/delete denied.                                                           | Read all audit columns through `owner_repair_status_history`; rows are trigger-written and client append/update/delete is not granted.                          |
 | `repair_internal_notes`          | No access                                                                                                                       | No access                                                                                                                                                                          | Select/insert/update/delete.                                                                                                                                    |
 | `repair_attachments` metadata    | No access                                                                                                                       | Select/insert only for own requests; update/delete denied                                                                                                                          | Select/insert/update/delete. Storage objects need their separate policies.                                                                                      |
@@ -261,6 +277,7 @@ Perform these tests in a non-production project with two distinct customer Auth 
 
 - No SQL was run and no remote project state was inspected in this workspace session. Review preflight output before applying the migration.
 - The repair booking migration has not been run against the remote Supabase project from this workspace. Review preflight output and verify its policies in the target project before enabling live customer uploads.
+- Migration `006_customer_repair_lifecycle.sql`, its Edge Function, Vault secret, and cron schedule have not been applied/configured or tested against the remote project. Automatic cleanup will not run until all are set up.
 - Migration `004_public_business_profile.sql` must be applied in the target Supabase project before public business profile synchronization can be verified there.
 - No Edge Function for public signed showcase URLs exists. Published post media remains private until that trusted service is built.
 - The public inquiry form is not connected; customer-created repair requests require a signed-in customer. Anonymous repair intake needs a separately reviewed rate-limited Edge Function, not an anon INSERT policy.

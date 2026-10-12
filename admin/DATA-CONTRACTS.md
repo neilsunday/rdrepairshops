@@ -6,7 +6,7 @@ This document describes the live owner dashboard and the Supabase records it con
 
 The UI consumes collections by stable module key and normalizes them to records shaped below. Both adapters return `{ mode, records, total, page, pageSize }`; the production adapter additionally reads overview metrics and business settings. Supported owner operations are repair request create/update, append-only internal notes, service create/update, client notebook entry create/update/delete, notification read state, and settings save. Repair showcase posts and comments remain part of the database contract for public-site compatibility, but are no longer managed from the admin dashboard. Customer directory and activity log entries are read-only. Do not put service-role credentials in browser code. Every query and mutation must be authorized by Supabase Auth and RLS; client-side visibility is not authorization.
 
-The dashboard deliberately has no direct customer deletion, role assignment, Storage upload, or anonymous public repair intake. Those require reviewed data-retention, authorization, and private Storage flows beyond this UI contract. Do not show a success state until the backend confirms the operation. UI states include loading, empty, error, filtered no-results, validation error, and operation success. Preview mode remains read-only.
+The dashboard deliberately has no repair-request deletion control, role assignment, Storage upload, or anonymous public repair intake. Customer request edit/delete is restricted to the authenticated customer in the client portal; customer deletion removes that request's photos, while owner work notes and status history are retained as snapshots. The lifecycle migration preserves owner select/insert/update access while denying owner DELETE through the authenticated API. Do not show a success state until the backend confirms the operation. UI states include loading, empty, error, filtered no-results, validation error, and operation success. Preview mode remains read-only.
 
 ## Relationships and Fields
 
@@ -18,10 +18,11 @@ The dashboard deliberately has no direct customer deletion, role assignment, Sto
 
 ### Repair requests
 
-- `id`, human-readable `reference_number`, nullable `customer_id`, customer name/email/phone snapshot, `device_type`, `brand`, `model`, `reported_issue`, nullable `service_id`, `status`, `priority`, `submitted_at`, `updated_at`, nullable `assigned_technician_id`, private `repair_internal_notes`, and customer-visible status messages.
+- `id`, human-readable `reference_number`, nullable `customer_id`, customer name/email/phone snapshot, `device_type`, `brand`, `model`, `reported_issue`, nullable `service_id`, `status`, `priority`, `submitted_at`, `updated_at`, `completed_at`, `retention_cleanup_started_at`, nullable `assigned_technician_id`, private `repair_internal_notes`, and customer-visible status messages.
 - Status values: `submitted`, `inspecting`, `awaiting_approval`, `approved`, `in_progress`, `ready_for_pickup`, `completed`, `cancelled`.
 - Priority values: `low`, `normal`, `high`, `urgent`.
 - Keep customer-contact snapshots on a request so historical records remain understandable if a profile changes. Contact fields are private.
+- Migration `006_customer_repair_lifecycle.sql` allows customers to edit/delete only their own request. They cannot modify lifecycle status, assignment, reference, completion time, cleanup marker, or staff-authored updates. Completed requests and their private photos become eligible for cleanup 48 hours after completion. Owner notes and status history are retained with request-reference, client-name, and device snapshots when the request is deleted.
 - The owner dashboard work log reuses `repair_internal_notes` for timestamped service completion evidence (work performed, parts used, and checks completed). It is owner-only and must never be presented as a customer-visible update.
 
 ### Repair status history
@@ -39,6 +40,7 @@ The dashboard deliberately has no direct customer deletion, role assignment, Sto
 
 - `id`, `repair_request_id`, private storage `object_path`, `uploaded_by`, `content_type`, `byte_size`, optional `alt_text`, `created_at`.
 - Repair attachments and object metadata are private to authorized owner/backend access; never treat a public bucket URL as access control.
+- Customer deletion removes own-request Storage objects before deleting the request. Scheduled cleanup uses the server-side `cleanup-completed-repairs` Edge Function and service role; deployment, Vault secret setup, and the `pg_cron` schedule are required (see `supabase/SETUP.md`).
 
 ### Customers
 

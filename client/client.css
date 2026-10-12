@@ -1158,6 +1158,111 @@ html[data-theme="dark"] .client-card {
   border-radius: 5px;
 }
 
+.repair-retention {
+  margin-top: 0.7rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--client-warning) 30%, var(--color-border));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--client-warning) 8%, var(--color-surface));
+  color: var(--color-muted);
+  font-size: 0.76rem;
+}
+
+.repair-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.repair-delete-button {
+  color: var(--client-danger);
+}
+
+.repair-card__feedback {
+  margin-top: 0.5rem;
+  color: var(--client-danger);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.repair-client-dialog {
+  width: min(100% - 2rem, 720px);
+  max-height: min(90vh, 900px);
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.repair-client-dialog::backdrop {
+  background: rgb(0 0 0 / 58%);
+}
+
+.repair-client-dialog__form {
+  display: grid;
+  gap: 1.1rem;
+  padding: clamp(1rem, 3vw, 1.75rem);
+}
+
+.repair-client-dialog__form h2 {
+  font-size: 1.25rem;
+}
+
+.repair-client-dialog__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.repair-edit-field {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.repair-edit-field:has(textarea) {
+  grid-column: 1 / -1;
+}
+
+.repair-edit-field input,
+.repair-edit-field select,
+.repair-edit-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 3px;
+  background: var(--color-page);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.repair-edit-field textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.repair-edit-field :focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.repair-client-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.repair-edit-message {
+  color: var(--client-danger);
+  font-size: 0.8rem;
+}
+
 .client-footer {
   padding-top: 0.5rem;
   border-top: 1px solid var(--color-border);
@@ -1242,6 +1347,10 @@ html[data-theme="dark"] .client-card {
 
   .history-actions .button {
     min-height: 38px;
+  }
+
+  .repair-client-dialog__fields {
+    grid-template-columns: 1fr;
   }
 }
 

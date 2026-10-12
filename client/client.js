@@ -316,6 +316,266 @@
     renderPhotoPreviews([]);
   };
 
+  const openRepairEditor = (request) => {
+    const dialog = document.createElement("dialog");
+    dialog.className = "repair-client-dialog";
+    dialog.setAttribute("aria-labelledby", "repair-client-dialog-title");
+    const form = document.createElement("form");
+    form.className = "repair-client-dialog__form";
+    const heading = makeText("h2", "", "Edit repair request");
+    heading.id = "repair-client-dialog-title";
+    const fields = document.createElement("div");
+    fields.className = "repair-client-dialog__fields";
+    const addField = ({ name, label, value = "", type = "text", required = false, rows, maxLength }) => {
+      const wrapper = document.createElement("label");
+      wrapper.className = "repair-edit-field";
+      wrapper.append(makeText("span", "", label));
+      const input = rows
+        ? document.createElement("textarea")
+        : document.createElement("input");
+      if (!rows) input.type = type;
+      input.name = name;
+      input.value = value || "";
+      input.required = required;
+      if (rows) input.rows = rows;
+      if (maxLength) input.maxLength = maxLength;
+      wrapper.append(input);
+      fields.append(wrapper);
+      return input;
+    };
+
+    const customerName = addField({
+      name: "customer_name",
+      label: "Your name",
+      value: request.customer_name,
+      required: true,
+      maxLength: 160,
+    });
+    const customerEmail = addField({
+      name: "customer_email",
+      label: "Email",
+      value: request.customer_email,
+      type: "email",
+      maxLength: 320,
+    });
+    const customerPhone = addField({
+      name: "customer_phone",
+      label: "Phone number",
+      value: request.customer_phone,
+      type: "tel",
+      maxLength: 40,
+    });
+    const deviceType = addField({
+      name: "device_type",
+      label: "Device type",
+      value: request.device_type,
+      required: true,
+      maxLength: 100,
+    });
+    const brand = addField({
+      name: "brand",
+      label: "Brand",
+      value: request.brand,
+      required: true,
+      maxLength: 100,
+    });
+    const model = addField({
+      name: "model",
+      label: "Model",
+      value: request.model,
+      required: true,
+      maxLength: 160,
+    });
+    const serviceLabel = document.createElement("label");
+    serviceLabel.className = "repair-edit-field";
+    serviceLabel.append(makeText("span", "", "Repair service"));
+    const service = document.createElement("select");
+    service.name = "service_id";
+    service.append(new Option("Other / not listed", ""));
+    for (const item of repairServices) {
+      service.append(
+        new Option(`${item.name} · ${item.category}`, item.id),
+      );
+    }
+    if (
+      request.service_id &&
+      !repairServices.some((item) => item.id === request.service_id)
+    ) {
+      service.append(
+        new Option(
+          `${request.service_name_snapshot} · current service`,
+          request.service_id,
+        ),
+      );
+    }
+    service.value = request.service_id || "";
+    serviceLabel.append(service);
+    fields.append(serviceLabel);
+    const reportedIssue = addField({
+      name: "reported_issue",
+      label: "Describe the issue",
+      value: request.reported_issue,
+      required: true,
+      rows: 5,
+      maxLength: 5000,
+    });
+    customerEmail.addEventListener("input", () =>
+      customerEmail.setCustomValidity(""),
+    );
+    customerPhone.addEventListener("input", () =>
+      customerPhone.setCustomValidity(""),
+    );
+    const message = makeText("p", "repair-edit-message", "");
+    message.setAttribute("role", "status");
+    message.setAttribute("aria-live", "polite");
+    const actions = document.createElement("div");
+    actions.className = "repair-client-dialog__actions";
+    const cancel = makeText("button", "button button--quiet", "Cancel");
+    cancel.type = "button";
+    cancel.addEventListener("click", () => dialog.close());
+    const save = makeText("button", "button", "Save changes");
+    save.type = "submit";
+    actions.append(cancel, save);
+    form.append(heading, fields, message, actions);
+    dialog.append(form);
+    document.body.append(dialog);
+    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      customerEmail.value = customerEmail.value.trim();
+      customerPhone.value = customerPhone.value.trim();
+      customerPhone.setCustomValidity("");
+      customerEmail.setCustomValidity("");
+      if (customerEmail.value && !isValidEmail(customerEmail.value)) {
+        customerEmail.setCustomValidity("Enter a valid email address.");
+      }
+      if (customerPhone.value && !isValidPhilippineMobile(customerPhone.value)) {
+        customerPhone.setCustomValidity(
+          "Enter a valid Philippine mobile number, such as 09171234567 or +639171234567.",
+        );
+      }
+      if (!customerPhone.value.trim() && !customerEmail.value.trim()) {
+        customerPhone.setCustomValidity(
+          "Enter at least one contact method: phone number or email.",
+        );
+      }
+      if (!form.reportValidity()) return;
+
+      save.disabled = true;
+      save.textContent = "Saving…";
+      message.textContent = "";
+      try {
+        const { data, error } = await client
+          .from("repair_requests")
+          .update({
+            customer_name: customerName.value.trim(),
+            customer_email: customerEmail.value.trim() || null,
+            customer_phone: customerPhone.value.trim() || null,
+            device_type: deviceType.value.trim(),
+            brand: brand.value.trim(),
+            model: model.value.trim(),
+            service_id: service.value || null,
+            reported_issue: reportedIssue.value.trim(),
+          })
+          .eq("id", request.id)
+          .eq("customer_id", currentUser.id)
+          .select("id")
+          .maybeSingle();
+        if (error) throw error;
+        if (!data)
+          throw new Error(
+            "This request could not be updated. It may have been deleted; refresh your repair list and try again.",
+          );
+        dialog.close();
+        showGlobalMessage(
+          `Repair request ${request.reference_number} was updated.`,
+        );
+        try {
+          await loadRepairs();
+        } catch (refreshError) {
+          console.error(
+            "Repair request was updated but the list could not refresh:",
+            refreshError,
+          );
+          showRepairLoadError(refreshError);
+        }
+      } catch (error) {
+        console.error("Customer repair update failed:", error);
+        message.textContent = friendlyError(error);
+        save.disabled = false;
+        save.textContent = "Save changes";
+      }
+    });
+    dialog.showModal();
+  };
+
+  const deleteCustomerRepair = async (request, article, button) => {
+    if (
+      !window.confirm(
+        `Permanently delete repair request ${request.reference_number} and its uploaded photos? This cannot be undone.`,
+      )
+    )
+      return;
+
+    button.disabled = true;
+    const editButton = article.querySelector(".repair-card__actions button");
+    if (editButton) editButton.disabled = true;
+    button.textContent = "Deleting…";
+    const feedback = article.querySelector(".repair-card__feedback");
+    feedback.textContent = "Removing uploaded photos and request…";
+    try {
+      const { data: attachments, error: attachmentError } = await client
+        .from("repair_attachments")
+        .select("object_path")
+        .eq("repair_request_id", request.id);
+      if (attachmentError) throw attachmentError;
+
+      const paths = (attachments || []).map((attachment) => attachment.object_path);
+      if (paths.length) {
+        const { error: storageError } = await client
+          .storage
+          .from("repair-attachments")
+          .remove(paths);
+        if (storageError)
+          throw new Error(
+            `Photos could not all be removed; the request was kept. ${storageError.message}`,
+          );
+      }
+
+      const { data, error } = await client
+        .from("repair_requests")
+        .delete()
+        .eq("id", request.id)
+        .eq("customer_id", currentUser.id)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data)
+        throw new Error(
+          "This request was not deleted. Refresh your repair list and try again.",
+        );
+
+      showGlobalMessage(
+        `Repair request ${request.reference_number} and its photos were deleted.`,
+      );
+      try {
+        await loadRepairs();
+      } catch (refreshError) {
+        console.error(
+          "Repair request was deleted but the list could not refresh:",
+          refreshError,
+        );
+        showRepairLoadError(refreshError);
+      }
+    } catch (error) {
+      console.error("Customer repair deletion failed:", error);
+      feedback.textContent = friendlyError(error);
+      button.disabled = false;
+      if (editButton) editButton.disabled = false;
+      button.textContent = "Delete request";
+    }
+  };
+
   const showRepairLoadError = (error) => {
     const state = makeText("div", "empty-state empty-state--error");
     state.append(
@@ -403,6 +663,20 @@
       ),
       makeText("p", "repair-meta", `Submitted ${formatDate(request.submitted_at)}`),
     );
+    if (request.status === "completed" && request.completed_at) {
+      const completedTime = Date.parse(request.completed_at);
+      if (!Number.isNaN(completedTime)) {
+        const cleanupTime = completedTime + 2 * 24 * 60 * 60 * 1000;
+        const retention = makeText(
+          "p",
+          "repair-retention",
+          cleanupTime > Date.now()
+            ? `This completed request and its photos are scheduled for automatic deletion after ${formatDate(new Date(cleanupTime).toISOString())}.`
+            : "This completed request is scheduled for automatic deletion. You can still remove it now.",
+        );
+        article.append(retention);
+      }
+    }
 
     if (request.reported_issue) {
       const issue = document.createElement("details");
@@ -467,6 +741,29 @@
       }
       article.append(photos);
     }
+    const actions = document.createElement("div");
+    actions.className = "repair-card__actions";
+    const edit = makeText(
+      "button",
+      "button button--quiet button--small",
+      "Edit request",
+    );
+    edit.type = "button";
+    edit.addEventListener("click", () => openRepairEditor(request));
+    const remove = makeText(
+      "button",
+      "button button--quiet button--small repair-delete-button",
+      "Delete request",
+    );
+    remove.type = "button";
+    const feedback = makeText("p", "repair-card__feedback", "");
+    feedback.setAttribute("role", "status");
+    feedback.setAttribute("aria-live", "polite");
+    remove.addEventListener("click", () =>
+      deleteCustomerRepair(request, article, remove),
+    );
+    actions.append(edit, remove);
+    article.append(actions, feedback);
     return article;
   };
 
@@ -475,7 +772,7 @@
     const { data: requests, error: requestError } = await client
       .from("repair_requests")
       .select(
-        "id,reference_number,device_type,brand,model,reported_issue,service_name_snapshot,status,submitted_at,customer_visible_note",
+        "id,reference_number,customer_name,customer_email,customer_phone,device_type,brand,model,reported_issue,service_id,service_name_snapshot,status,submitted_at,completed_at,customer_visible_note",
       )
       .eq("customer_id", currentUser.id)
       .order("submitted_at", { ascending: false });

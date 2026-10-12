@@ -1044,6 +1044,11 @@ ol {
   max-width: 300px;
   overflow-wrap: anywhere;
 }
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
 .table-action {
   min-height: 32px;
   padding: 0.35rem 0.5rem;

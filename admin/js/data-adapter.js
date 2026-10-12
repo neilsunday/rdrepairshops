@@ -19,8 +19,6 @@
       "serviceName",
     ],
     customers: ["displayName", "email", "phone"],
-    posts: ["title", "serviceName"],
-    comments: ["postTitle", "authorName", "body"],
     services: ["name", "category"],
     notifications: ["title", "detail"],
     activity: ["actor", "action", "target"],
@@ -133,29 +131,6 @@
         accountStatus: record.account_status,
       };
     }
-    if (collection === "posts") {
-      return {
-        id: record.id,
-        title: record.title,
-        caption: record.caption,
-        serviceId: record.service_id,
-        serviceName: record.service_name || "Not linked",
-        status: record.status,
-        mediaCount: Number(record.media_count || 0),
-        updatedAt: record.updated_at,
-      };
-    }
-    if (collection === "comments") {
-      return {
-        id: record.id,
-        postId: record.post_id,
-        postTitle: record.post_title || "Post unavailable",
-        authorName: record.author_name_snapshot,
-        body: record.body,
-        status: record.status,
-        submittedAt: record.created_at,
-      };
-    }
     if (collection === "services") {
       return {
         id: record.id,
@@ -242,19 +217,10 @@
     async addInternalNote() {
       throw new Error("Preview mode is read-only.");
     },
-    async moderateComment() {
-      throw new Error("Preview mode is read-only.");
-    },
     async createService() {
       throw new Error("Preview mode is read-only.");
     },
     async updateService() {
-      throw new Error("Preview mode is read-only.");
-    },
-    async createPost() {
-      throw new Error("Preview mode is read-only.");
-    },
-    async updatePost() {
       throw new Error("Preview mode is read-only.");
     },
     async markNotificationRead() {
@@ -318,8 +284,6 @@
       } else {
         const source = {
           customers: ["owner_customer_directory", "created_at"],
-          posts: ["owner_showcase_posts", "updated_at"],
-          comments: ["owner_comments", "created_at"],
           services: ["repair_services", "sort_order"],
           notifications: ["notifications", "created_at"],
           activity: ["admin_activity_logs", "created_at"],
@@ -334,8 +298,6 @@
         const filterColumns =
           {
             customers: { accountStatus: "account_status" },
-            posts: { status: "status" },
-            comments: { status: "status" },
             services: { status: "status" },
             notifications: {},
           }[collection] || {};
@@ -346,8 +308,6 @@
         const fields =
           {
             customers: ["display_name", "email", "phone"],
-            posts: ["title", "caption"],
-            comments: ["body", "author_name_snapshot"],
             services: ["name", "category"],
             notifications: ["title", "body", "notification_type"],
             activity: ["action", "entity_type", "entity_id"],
@@ -433,74 +393,6 @@
               histories.get(row.id) || [],
               notes.get(row.id) || [],
             ),
-          ),
-          total: count || 0,
-          page,
-          pageSize,
-        };
-      }
-
-      if (collection === "posts" && records.length) {
-        const postIds = records.map((row) => row.id);
-        const serviceIds = [
-          ...new Set(records.map((row) => row.service_id).filter(Boolean)),
-        ];
-        const [mediaResult, serviceResult] = await Promise.all([
-          client
-            .from("owner_showcase_media")
-            .select("post_id")
-            .in("post_id", postIds),
-          serviceIds.length
-            ? client
-                .from("repair_services")
-                .select("id,name")
-                .in("id", serviceIds)
-            : Promise.resolve({ data: [], error: null }),
-        ]);
-        if (mediaResult.error || serviceResult.error)
-          throw databaseError(
-            "Could not load showcase relations",
-            mediaResult.error || serviceResult.error,
-          );
-        const mediaCounts = new Map();
-        for (const row of mediaResult.data || [])
-          mediaCounts.set(row.post_id, (mediaCounts.get(row.post_id) || 0) + 1);
-        const services = new Map(
-          (serviceResult.data || []).map((row) => [row.id, row.name]),
-        );
-        return {
-          mode: "production",
-          records: records.map((row) =>
-            mapRecord(collection, {
-              ...row,
-              media_count: mediaCounts.get(row.id) || 0,
-              service_name: services.get(row.service_id),
-            }),
-          ),
-          total: count || 0,
-          page,
-          pageSize,
-        };
-      }
-
-      if (collection === "comments" && records.length) {
-        const postIds = [...new Set(records.map((row) => row.post_id))];
-        const { data: posts, error: postError } = await client
-          .from("owner_showcase_posts")
-          .select("id,title")
-          .in("id", postIds);
-        if (postError)
-          throw databaseError("Could not load comment post titles", postError);
-        const titleById = new Map(
-          (posts || []).map((row) => [row.id, row.title]),
-        );
-        return {
-          mode: "production",
-          records: records.map((row) =>
-            mapRecord(collection, {
-              ...row,
-              post_title: titleById.get(row.post_id),
-            }),
           ),
           total: count || 0,
           page,
@@ -667,23 +559,6 @@
       if (error) throw databaseError("Internal note could not be saved", error);
       return data;
     },
-    async moderateComment(id, status, userId) {
-      if (!["approved", "rejected", "hidden"].includes(status))
-        throw new Error("Invalid moderation state.");
-      const client = await window.AdminSupabaseClient.get();
-      const { data, error } = await client
-        .from("comments")
-        .update({
-          status,
-          moderated_by: userId,
-          moderated_at: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select("id,status")
-        .single();
-      if (error) throw databaseError("Comment moderation was rejected", error);
-      return data;
-    },
     async createService(payload) {
       const client = await window.AdminSupabaseClient.get();
       const { data, error } = await client
@@ -714,38 +589,6 @@
         .select("id,name,status,updated_at")
         .single();
       if (error) throw databaseError("Service update was rejected", error);
-      return data;
-    },
-    async createPost(payload) {
-      const client = await window.AdminSupabaseClient.get();
-      const { data, error } = await client
-        .from("repair_posts")
-        .insert(payload)
-        .select("id,title,status")
-        .single();
-      if (error)
-        throw databaseError("Repair post could not be created", error);
-      return data;
-    },
-    async updatePost(id, payload) {
-      const allowed = [
-        "title",
-        "caption",
-        "service_id",
-        "status",
-        "published_at",
-      ];
-      const safePayload = Object.fromEntries(
-        Object.entries(payload).filter(([key]) => allowed.includes(key)),
-      );
-      const client = await window.AdminSupabaseClient.get();
-      const { data, error } = await client
-        .from("repair_posts")
-        .update(safePayload)
-        .eq("id", id)
-        .select("id,title,status,updated_at")
-        .single();
-      if (error) throw databaseError("Repair post update was rejected", error);
       return data;
     },
     async markNotificationRead(id) {

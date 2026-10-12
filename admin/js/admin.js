@@ -81,48 +81,6 @@
         ["accountStatus", "Profile status"],
       ],
     },
-    posts: {
-      title: "Repair Posts / Showcase",
-      description: "Manage repair documentation for the public showcase.",
-      collection: "posts",
-      search: ["title", "serviceName"],
-      filters: [
-        {
-          key: "status",
-          label: "Post status",
-          options: ["draft", "published", "archived"],
-        },
-      ],
-      columns: [
-        ["title", "Post title"],
-        ["serviceName", "Related service"],
-        ["mediaCount", "Media items"],
-        ["status", "Status"],
-        ["updatedAt", "Updated"],
-      ],
-      cta: "Create post",
-    },
-    comments: {
-      title: "Comments & Moderation",
-      description: "Review incoming comments and their moderation state.",
-      collection: "comments",
-      search: ["postTitle", "authorName", "body"],
-      filters: [
-        {
-          key: "status",
-          label: "Moderation status",
-          options: ["pending", "approved", "rejected", "hidden"],
-        },
-      ],
-      columns: [
-        ["postTitle", "Post"],
-        ["authorName", "Author"],
-        ["body", "Comment"],
-        ["status", "Status"],
-        ["submittedAt", "Received"],
-      ],
-      action: "moderation",
-    },
     services: {
       title: "Services",
       description: "Manage the services shown in the public catalog.",
@@ -469,6 +427,7 @@
         });
         if ((definition.action || definition.cta) && includeAction) {
           const actionCell = document.createElement("td");
+          actionCell.className = "table-actions";
           if (definition.action === "details") {
             const action = makeElement("button", "table-action", "View details");
             action.type = "button";
@@ -479,16 +438,24 @@
               `View repair details for ${record.reference}`,
             );
             actionCell.append(action);
-          }
-          if (definition.action === "moderation") {
-            const action = makeElement("button", "table-action", "Review");
-            action.type = "button";
-            action.disabled = !isProduction();
-            action.dataset.recordAction = "edit";
-            action.dataset.recordId = record.id;
-            if (!isProduction())
-              action.title = "Moderation is disabled in demo preview mode";
-            actionCell.append(action);
+            if (
+              isProduction() &&
+              !["completed", "cancelled"].includes(record.status)
+            ) {
+              const complete = makeElement(
+                "button",
+                "table-action",
+                "Mark as done",
+              );
+              complete.type = "button";
+              complete.dataset.recordAction = "complete-repair";
+              complete.dataset.recordId = record.id;
+              complete.setAttribute(
+                "aria-label",
+                `Mark repair ${record.reference} as done`,
+              );
+              actionCell.append(complete);
+            }
           }
           if (definition.action === "notification") {
             const action = makeElement(
@@ -650,8 +617,8 @@
         "p",
         "module-action-note",
         isProduction()
-          ? "Customer records are read-only. Repair, service, post, moderation, notification, and settings actions are saved to Supabase."
-          : "Data changes, moderation decisions, and destructive actions are disabled in this preview.",
+          ? "Customer records are read-only. Repair, service, notification, and settings actions are saved to Supabase."
+          : "Data changes and destructive actions are disabled in this preview.",
       );
       actionNote.id = "module-action-note";
       panel.append(actionNote);
@@ -707,7 +674,6 @@
       preferences.append(legend);
       [
         ["email_repairs", "Repair request updates"],
-        ["email_comments", "Comment moderation alerts"],
         ["email_activity", "Administrative activity alerts"],
       ].forEach(([key, text]) => {
         const label = makeElement("label", "settings-checkbox");
@@ -1065,8 +1031,6 @@
       const entityName = {
         repairs: "repair request",
         services: "service",
-        posts: "showcase post",
-        comments: "comment",
       }[moduleKey];
       const title = makeElement(
         "h2",
@@ -1079,7 +1043,7 @@
       status.setAttribute("aria-live", "polite");
       let services = [];
 
-      if (["repairs", "posts"].includes(moduleKey)) {
+      if (moduleKey === "repairs") {
         const result = await window.AdminDataAdapter.list("services", {
           pageSize: 100,
           filters: moduleKey === "repairs" ? { status: "active" } : {},
@@ -1192,55 +1156,6 @@
           type: "number",
           value: record?.sortOrder ?? 0,
         });
-      } else if (moduleKey === "posts") {
-        addEditorField(fields, {
-          key: "title",
-          label: "Title",
-          value: record?.title,
-          required: true,
-        });
-        addEditorField(fields, {
-          key: "caption",
-          label: "Caption",
-          value: record?.caption,
-          rows: 5,
-        });
-        addEditorSelect(fields, {
-          key: "service_id",
-          label: "Related service",
-          options: [
-            ["", "Not linked"],
-            ...services.map((service) => [service.id, service.name]),
-          ],
-          value: record?.serviceId || "",
-        });
-        addEditorSelect(fields, {
-          key: "status",
-          label: "Publication status",
-          options: ["draft", "published", "archived"].map((value) => [
-            value,
-            formatValue("status", value),
-          ]),
-          value: record?.status || "draft",
-        });
-      } else if (moduleKey === "comments") {
-        addEditorField(fields, {
-          key: "body",
-          label: "Comment",
-          value: record.body,
-          rows: 4,
-        }).readOnly = true;
-        addEditorSelect(fields, {
-          key: "status",
-          label: "Moderation decision",
-          options: ["approved", "rejected", "hidden"].map((value) => [
-            value,
-            formatValue("status", value),
-          ]),
-          value: ["approved", "rejected", "hidden"].includes(record.status)
-            ? record.status
-            : "approved",
-        });
       }
 
       const actions = makeElement("div", "record-editor__actions");
@@ -1322,34 +1237,6 @@
             if (record)
               await window.AdminDataAdapter.updateService(record.id, payload);
             else await window.AdminDataAdapter.createService(payload);
-          } else if (moduleKey === "posts") {
-            const payload = {
-              title: values.title.trim(),
-              caption: values.caption.trim(),
-              service_id: values.service_id || null,
-              status: values.status,
-              published_at:
-                values.status === "published"
-                  ? record?.status === "published"
-                    ? undefined
-                    : new Date().toISOString()
-                  : null,
-            };
-            if (record) {
-              if (payload.published_at === undefined)
-                delete payload.published_at;
-              await window.AdminDataAdapter.updatePost(record.id, payload);
-            } else {
-              payload.author_id = currentUserId;
-              if (!payload.published_at) delete payload.published_at;
-              await window.AdminDataAdapter.createPost(payload);
-            }
-          } else if (moduleKey === "comments") {
-            await window.AdminDataAdapter.moderateComment(
-              record.id,
-              values.status,
-              currentUserId,
-            );
           }
           dialog.close();
           await loadModule(moduleKey, activePage);
@@ -1379,7 +1266,6 @@
             String(values.get("business_hours") || "").trim() || null,
           notification_preferences: {
             email_repairs: values.has("email_repairs"),
-            email_comments: values.has("email_comments"),
             email_activity: values.has("email_activity"),
           },
           updated_by: currentUserId,
@@ -1459,6 +1345,34 @@
         return;
       }
       const recordAction = event.target.closest("[data-record-action]");
+      if (recordAction?.dataset.recordAction === "complete-repair") {
+        const record = activeRecords.find(
+          (item) => item.id === recordAction.dataset.recordId,
+        );
+        if (
+          !record ||
+          ["completed", "cancelled"].includes(record.status) ||
+          !window.confirm(
+            `Mark repair ${record.reference} as done? The customer will see this update in their repair dashboard.`,
+          )
+        )
+          return;
+        recordAction.disabled = true;
+        recordAction.textContent = "Saving…";
+        window.AdminDataAdapter.updateRepair(record.id, {
+          status: "completed",
+          customer_visible_note:
+            "Your repair is complete. Please contact the shop to arrange pickup.",
+        })
+          .then(() => loadModule(activeModule, activePage))
+          .catch((error) => {
+            console.error("Repair completion update failed:", error);
+            window.alert(error.message || "The repair could not be marked done.");
+            recordAction.disabled = false;
+            recordAction.textContent = "Mark as done";
+          });
+        return;
+      }
       if (recordAction?.dataset.recordAction === "mark-read") {
         recordAction.disabled = true;
         window.AdminDataAdapter.markNotificationRead(

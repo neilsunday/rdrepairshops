@@ -164,42 +164,6 @@
         accountStatus: "inquiry_only",
       },
     ],
-    posts: [
-      {
-        id: "demo-post-001",
-        title: "Display assembly inspection",
-        serviceName: "Screen Replacement",
-        status: "draft",
-        mediaCount: 1,
-        updatedAt: "2026-10-09T12:00:00Z",
-      },
-      {
-        id: "demo-post-002",
-        title: "Charging port assessment",
-        serviceName: "Charging Port Replacement",
-        status: "published",
-        mediaCount: 2,
-        updatedAt: "2026-10-08T10:00:00Z",
-      },
-    ],
-    comments: [
-      {
-        id: "demo-comment-001",
-        postTitle: "Charging port assessment",
-        authorName: "Demo Visitor 01",
-        body: "Is this service available for my model?",
-        status: "pending",
-        submittedAt: "2026-10-10T09:00:00Z",
-      },
-      {
-        id: "demo-comment-002",
-        postTitle: "Display assembly inspection",
-        authorName: "Demo Visitor 02",
-        body: "Thanks for sharing this repair note.",
-        status: "approved",
-        submittedAt: "2026-10-09T14:00:00Z",
-      },
-    ],
     services: [
       {
         id: "demo-service-screen",
@@ -233,8 +197,8 @@
       },
       {
         id: "demo-notification-002",
-        title: "Comment awaiting moderation",
-        detail: "A sample comment needs review.",
+        title: "Repair status updated",
+        detail: "A sample repair request has a new status.",
         status: "read",
         createdAt: "2026-10-09T15:30:00Z",
       },
@@ -250,8 +214,8 @@
       {
         id: "demo-activity-002",
         actor: "Demo Owner",
-        action: "Reviewed a comment",
-        target: "demo-comment-002",
+        action: "Updated repair priority",
+        target: "DEMO-R-002",
         createdAt: "2026-10-09T15:00:00Z",
       },
       {

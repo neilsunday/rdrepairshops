@@ -6,7 +6,7 @@ The repository contains Supabase migrations and an owner dashboard configured to
 
 The default dashboard uses Supabase Auth and the authenticated browser client. Owner authorization and row access must continue to be enforced by RLS; a service-role key must never be placed in browser code. The `?preview=1` dashboard is still isolated, synthetic, and read-only.
 
-The dashboard supports owner reads and writes for repair requests, services, showcase post text/status, comment moderation, notification read state, and business settings. Customer-directory and activity entries are read-only. The customer portal supports authenticated repair intake and private repair photos after migrations `001` through `003` are applied. Anonymous repair intake and showcase media upload are not supported.
+The dashboard supports owner reads and writes for repair requests, services, notification read state, work notes, and business settings. Customer-directory and activity entries are read-only. The customer portal supports authenticated repair intake and private repair photos after migrations `001` through `003` are applied. Migration `004` exposes only approved public business contact fields to the public website. Anonymous repair intake and showcase media upload are not supported.
 
 ## Migration Order
 
@@ -16,7 +16,8 @@ The dashboard supports owner reads and writes for repair requests, services, sho
 4. In SQL Editor, paste and run the complete `001_initial_schema.sql` once. It uses an explicit transaction. If it fails, do not remove statements or rerun blindly; inspect the reported object/state, restore if appropriate, then prepare a reviewed follow-up migration.
 5. Apply `migrations/002_owner_customer_directory.sql` and confirm its owner view along with the baseline tables, RLS, policies, and helper functions using the verification checklist below.
 6. Apply `migrations/003_customer_repair_booking.sql` after confirming `001` and `002` are installed. It configures the private repair-photo bucket and scoped customer/owner policies; database table RLS alone does not authorize Storage objects.
-7. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
+7. Apply `migrations/004_public_business_profile.sql` after confirming `001` is installed. It seeds existing public contact values if needed and exposes only the allowlisted public profile view.
+8. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
 
 ## Exact ordered manual checklist
 
@@ -32,6 +33,7 @@ The dashboard supports owner reads and writes for repair requests, services, sho
    - Run `supabase/migrations/001_initial_schema.sql` first.
    - Only after that is confirmed, run `supabase/migrations/002_owner_customer_directory.sql`. The owner dashboard's Customers section depends on `public.owner_customer_directory`.
    - Only after `001` and `002` are confirmed, run `supabase/migrations/003_customer_repair_booking.sql`. It configures private `repair-attachments` Storage access and enforces the customer photo limits.
+   - Run `supabase/migrations/004_public_business_profile.sql` after `001`. This enables public profile synchronization without granting access to the owner-only settings table.
    - Do not run the SQL in a different order or with destructive resets.
 
 4. Create or invite the owner Auth account.
@@ -122,7 +124,7 @@ Internal repair notes are in `repair_internal_notes`, not a column on customer-r
 
 The profiles trigger creates a profile for new Auth users and backfills existing `auth.users` into the newly created profile table without overwriting conflicts. It does **not** assign roles. Profile email is a private snapshot created from Auth; email changes should be managed through Supabase Auth and synchronized deliberately in a future integration.
 
-`business_settings` is a singleton (`id = 1`) containing `business_name`, `public_phone`, `public_email`, `public_address`, `business_hours`, `notification_preferences`, `updated_by`, and timestamps. It is owner-only. The browser Settings form remains disabled until a trusted owner session and validated settings write path are connected. The service catalog's public `is_active` concept maps to `repair_services.status = 'active'`.
+`business_settings` is a singleton (`id = 1`) containing `business_name`, `public_phone`, `public_email`, `public_address`, `business_hours`, `notification_preferences`, `updated_by`, and timestamps. It is owner-only. Migration `004_public_business_profile.sql` creates a public view restricted to the business name, public contact details, and business hours; it does not expose notification preferences or owner identifiers. The website uses the allowlisted view to update its Contact section and branding. The service catalog's public `is_active` concept maps to `repair_services.status = 'active'`.
 
 Public showcase clients should query `public_showcase_posts`, `public_showcase_media`, and `public_approved_comments`; these safe-column views omit author/profile IDs, moderator IDs, and private object paths. Owner dashboard reads should use `owner_showcase_posts`, `owner_showcase_media`, `owner_comments`, and `owner_repair_status_history`. Their view predicates check the provisioned owner role. Do not grant direct base-table SELECT to anonymous users; the migration revokes it and relies on these bounded views. Customer-authenticated direct comment and repair-history reads are column-limited; RLS still permits only published approved comments plus that customer's own comments/history.
 
@@ -247,6 +249,7 @@ Perform these tests in a non-production project with two distinct customer Auth 
 - [ ] Verify service/post publication controls, moderation writes, notifications, and activity logs use expected policies.
 - [ ] Verify the owner retains reaction select/delete access after a post is unpublished, while customers do not.
 - [ ] Verify only the owner can read/update `business_settings`, and the authenticated client cannot delete the singleton row.
+- [ ] Verify anonymous and authenticated users can read only the approved columns in `public_business_profile`, and cannot read `business_settings`.
 - [ ] Confirm an account with an `admin` enum role but no `owner` role does not get owner access.
 - [ ] Confirm customer uploads are private, per-request photo limits are enforced, and owner signed URLs work.
 
@@ -254,6 +257,7 @@ Perform these tests in a non-production project with two distinct customer Auth 
 
 - No SQL was run and no remote project state was inspected in this workspace session. Review preflight output before applying the migration.
 - The repair booking migration has not been run against the remote Supabase project from this workspace. Review preflight output and verify its policies in the target project before enabling live customer uploads.
+- Migration `004_public_business_profile.sql` must be applied in the target Supabase project before public business profile synchronization can be verified there.
 - No Edge Function for public signed showcase URLs exists. Published post media remains private until that trusted service is built.
 - The public inquiry form is not connected; customer-created repair requests require a signed-in customer. Anonymous repair intake needs a separately reviewed rate-limited Edge Function, not an anon INSERT policy.
 - Realtime membership does not create subscriptions or prove that a UI subscription is safe; test per-user event filtering.

@@ -1282,7 +1282,8 @@ ol {
   color: var(--admin-muted);
   font-size: 0.72rem;
 }
-.settings-field input {
+.settings-field input,
+.settings-field textarea {
   width: 100%;
   min-height: 42px;
   padding: 0.55rem 0.65rem;
@@ -1290,6 +1291,16 @@ ol {
   border-radius: 2px;
   background: var(--admin-surface-alt);
   color: var(--admin-muted);
+  font: inherit;
+}
+.settings-field textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+.settings-field input:focus-visible,
+.settings-field textarea:focus-visible {
+  outline: 2px solid var(--admin-action);
+  outline-offset: 2px;
 }
 .settings-field input:disabled,
 .settings-preferences:disabled {

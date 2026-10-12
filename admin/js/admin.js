@@ -60,6 +60,37 @@
       action: "details",
       cta: "New repair request",
     },
+    notes: {
+      title: "Completed Service Notes",
+      description:
+        "Review completed repairs and the owner-only work notes recorded as service proof.",
+      collection: "repairs",
+      search: [
+        "reference",
+        "customerName",
+        "brand",
+        "model",
+        "reportedIssue",
+        "serviceName",
+      ],
+      filters: [
+        {
+          key: "status",
+          label: "Repair status",
+          options: ["completed"],
+        },
+      ],
+      columns: [
+        ["reference", "Reference"],
+        ["customerName", "Customer"],
+        ["brandModel", "Device"],
+        ["serviceName", "Service"],
+        ["workNoteCount", "Work notes"],
+        ["updatedAt", "Completed"],
+      ],
+      action: "details",
+      actionLabel: "View notes",
+    },
     customers: {
       title: "Customers",
       description:
@@ -326,7 +357,10 @@
       window.AdminDataAdapter?.mode === "production";
     const getQueryState = (moduleKey) => {
       if (!moduleQueryState.has(moduleKey))
-        moduleQueryState.set(moduleKey, { search: "", filters: {} });
+        moduleQueryState.set(moduleKey, {
+          search: "",
+          filters: moduleKey === "notes" ? { status: "completed" } : {},
+        });
       return moduleQueryState.get(moduleKey);
     };
 
@@ -424,6 +458,8 @@
           const value =
             key === "brandModel"
               ? `${record.brand} ${record.model}`
+              : key === "workNoteCount"
+                ? String(record.workNotes?.length || 0)
               : record[key];
           const cell = makeElement(
             "td",
@@ -441,13 +477,17 @@
           const actionCell = document.createElement("td");
           actionCell.className = "table-actions";
           if (definition.action === "details") {
-            const action = makeElement("button", "table-action", "View details");
+            const action = makeElement(
+              "button",
+              "table-action",
+              definition.actionLabel || "View details",
+            );
             action.type = "button";
             action.dataset.recordAction = "details";
             action.dataset.recordId = record.id;
             action.setAttribute(
               "aria-label",
-              `View repair details for ${record.reference}`,
+              `${definition.actionLabel || "View repair details"} for ${record.reference}`,
             );
             actionCell.append(action);
             if (
@@ -495,6 +535,103 @@
       table.append(head, body);
       wrapper.append(table);
       return wrapper;
+    };
+
+    const renderRepairDetails = async (record) => {
+      const detailPanel = host.querySelector("[data-repair-details]");
+      if (!record || !detailPanel) return;
+      const content = detailPanel.querySelector(".repair-detail-content");
+      content.replaceChildren();
+      detailPanel.dataset.repairId = record.id;
+      [
+        [
+          "Customer",
+          [record.customerName, record.customerEmail, record.customerPhone]
+            .filter(Boolean)
+            .join(" · "),
+        ],
+        ["Device", `${record.deviceType} · ${record.brand} ${record.model}`],
+        ["Reported issue", record.reportedIssue],
+        ["Selected service", record.serviceName],
+        [
+          "Status and priority",
+          `${formatValue("status", record.status)} · ${formatValue("priority", record.priority)}`,
+        ],
+        [
+          "Submitted / updated",
+          `${formatValue("submittedAt", record.submittedAt)} · ${formatValue("updatedAt", record.updatedAt)}`,
+        ],
+        ["Assigned technician", record.assignedTechnician || "Not assigned"],
+        [
+          "Customer-visible status history",
+          record.customerStatusHistory
+            .map(
+              (entry) =>
+                `${formatValue("status", entry.status)}: ${entry.message}`,
+            )
+            .filter(Boolean)
+            .join("; "),
+        ],
+        ["Customer-visible notes", record.customerVisibleNotes],
+      ].forEach(([labelText, value]) => {
+        const field = makeElement("div", "detail-field");
+        field.append(
+          makeElement("dt", "", labelText),
+          makeElement("dd", "", value || "Not available"),
+        );
+        content.append(field);
+      });
+      renderWorkNotes(record, detailPanel.querySelector("[data-work-log]"));
+      const attachmentsField = makeElement("div", "detail-field detail-field--wide");
+      attachmentsField.append(
+        makeElement("dt", "", "Customer photos"),
+        makeElement(
+          "dd",
+          "repair-attachment-list",
+          isProduction() ? "Loading photos…" : "Photos are not included in preview data.",
+        ),
+      );
+      content.append(attachmentsField);
+      if (isProduction()) {
+        try {
+          const attachments = await window.AdminDataAdapter.getRepairAttachments(
+            record.id,
+          );
+          if (detailPanel.dataset.repairId !== record.id) return;
+          const gallery = attachmentsField.querySelector("dd");
+          gallery.replaceChildren();
+          if (!attachments.length) {
+            gallery.textContent = "No photos attached.";
+          } else {
+            attachments.forEach((attachment) => {
+              const link = makeElement("a", "repair-attachment-link");
+              link.href = attachment.signedUrl;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              link.setAttribute(
+                "aria-label",
+                `Open customer photo ${attachment.original_filename}`,
+              );
+              const image = makeElement("img", "repair-attachment-image");
+              image.src = attachment.signedUrl;
+              image.alt = attachment.original_filename;
+              image.loading = "lazy";
+              link.append(image);
+              gallery.append(link);
+            });
+          }
+        } catch (error) {
+          console.error("Repair photo loading failed:", error);
+          if (detailPanel.dataset.repairId === record.id)
+            attachmentsField.querySelector("dd").textContent =
+              error.message || "Repair photos could not be loaded.";
+        }
+      }
+      detailPanel.hidden = false;
+      detailPanel.scrollIntoView({
+        behavior: reducedMotion.matches ? "auto" : "smooth",
+        block: "nearest",
+      });
     };
 
     const createNotificationList = (records) => {
@@ -702,24 +839,27 @@
           "p",
           "panel-note",
           isProduction()
-            ? "These details are stored in the owner-only business settings record."
+            ? "Saving publishes these business contact details on the public website and customer portal. Add multiple phones or emails on separate lines."
             : "Settings are read-only in the isolated demo preview.",
         ),
       );
       const form = document.createElement("form");
       form.className = "settings-form";
       [
-        ["Business name", "business_name", "Public-facing shop name", "text"],
-        ["Phone number", "public_phone", "Public contact phone", "tel"],
-        ["Email address", "public_email", "Public contact email", "email"],
-        ["Address", "public_address", "Public shop address", "text"],
-        ["Business hours", "business_hours", "Public business hours", "text"],
-      ].forEach(([name, key, placeholder, type]) => {
+        ["Business name", "business_name", "Public-facing shop name", false],
+        ["Phone number(s)", "public_phone", "One number per line", true],
+        ["Email address(es)", "public_email", "One email per line", true],
+        ["Address", "public_address", "Public shop address", true],
+        ["Business hours", "business_hours", "Public business hours", true],
+      ].forEach(([name, key, placeholder, multiline]) => {
         const label = makeElement("label", "settings-field");
         label.append(makeElement("span", "", name));
-        const input = document.createElement("input");
+        const input = multiline
+          ? document.createElement("textarea")
+          : document.createElement("input");
         input.name = key;
-        input.type = type;
+        if (multiline) input.rows = key === "public_address" ? 3 : 2;
+        else input.type = "text";
         input.placeholder = placeholder;
         input.value = settings?.[key] || "";
         input.disabled = !isProduction();
@@ -780,7 +920,7 @@
         );
       } else {
         view.append(makeDataPanel(definition));
-        if (moduleKey === "repairs") {
+        if (moduleKey === "repairs" || moduleKey === "notes") {
           const detail = makeElement("section", "panel repair-detail-panel");
           detail.dataset.repairDetails = "true";
           detail.hidden = true;
@@ -1433,10 +1573,22 @@
       save.disabled = true;
       status.textContent = "Saving settings…";
       try {
+        const publicEmails = String(values.get("public_email") || "")
+          .split(/[\n;,]+/)
+          .map((email) => email.trim())
+          .filter(Boolean);
+        const invalidEmail = publicEmails.find(
+          (email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+        );
+        if (invalidEmail) {
+          throw new Error(`Enter a valid contact email address: ${invalidEmail}`);
+        }
         await window.AdminDataAdapter.saveSettings({
           business_name: String(values.get("business_name") || "").trim(),
-          public_phone: String(values.get("public_phone") || "").trim() || null,
-          public_email: String(values.get("public_email") || "").trim() || null,
+          public_phone:
+            String(values.get("public_phone") || "").trim() || null,
+          public_email:
+            publicEmails.join("\n") || null,
           public_address:
             String(values.get("public_address") || "").trim() || null,
           business_hours:
@@ -1447,10 +1599,22 @@
           },
           updated_by: currentUserId,
         });
-        status.textContent = "Settings saved.";
+        try {
+          localStorage.setItem(
+            "rd-business-profile-updated",
+            String(Date.now()),
+          );
+        } catch (error) {
+          console.warn("Could not notify open public pages:", error);
+        }
+        status.textContent =
+          "Settings saved. Open public pages are being updated.";
+        save.disabled = false;
+        showToast("Business profile saved and published to the website.");
       } catch (error) {
         console.error("Business settings save failed:", error);
         status.textContent = error.message || "Settings could not be saved.";
+        showToast(status.textContent, "error");
         save.disabled = false;
       }
     };
@@ -1600,96 +1764,7 @@
       const record = activeRecords.find(
         (item) => item.id === detailAction.dataset.recordId,
       );
-      const detailPanel = host.querySelector("[data-repair-details]");
-      if (!record || !detailPanel) return;
-      const content = detailPanel.querySelector(".repair-detail-content");
-      content.replaceChildren();
-      detailPanel.dataset.repairId = record.id;
-      [
-        [
-          "Customer",
-          `${record.customerName} · ${record.customerEmail} · ${record.customerPhone}`,
-        ],
-        ["Device", `${record.deviceType} · ${record.brand} ${record.model}`],
-        ["Reported issue", record.reportedIssue],
-        ["Selected service", record.serviceName],
-        [
-          "Status and priority",
-          `${formatValue("status", record.status)} · ${formatValue("priority", record.priority)}`,
-        ],
-        [
-          "Submitted / updated",
-          `${formatValue("submittedAt", record.submittedAt)} · ${formatValue("updatedAt", record.updatedAt)}`,
-        ],
-        ["Assigned technician", record.assignedTechnician || "Not assigned"],
-        [
-          "Customer-visible status history",
-          record.customerStatusHistory
-            .map(
-              (entry) =>
-                `${formatValue("status", entry.status)}: ${entry.message}`,
-            )
-            .join("; "),
-        ],
-        ["Customer-visible notes", record.customerVisibleNotes],
-      ].forEach(([labelText, value]) => {
-        const field = makeElement("div", "detail-field");
-        field.append(
-          makeElement("dt", "", labelText),
-          makeElement("dd", "", value),
-        );
-        content.append(field);
-      });
-      renderWorkNotes(record, detailPanel.querySelector("[data-work-log]"));
-      const attachmentsField = makeElement("div", "detail-field detail-field--wide");
-      attachmentsField.append(
-        makeElement("dt", "", "Customer photos"),
-        makeElement(
-          "dd",
-          "repair-attachment-list",
-          isProduction() ? "Loading photos…" : "Photos are not included in preview data.",
-        ),
-      );
-      content.append(attachmentsField);
-      if (isProduction()) {
-        window.AdminDataAdapter.getRepairAttachments(record.id)
-          .then((attachments) => {
-            if (detailPanel.dataset.repairId !== record.id) return;
-            const gallery = attachmentsField.querySelector("dd");
-            gallery.replaceChildren();
-            if (!attachments.length) {
-              gallery.textContent = "No photos attached.";
-              return;
-            }
-            attachments.forEach((attachment) => {
-              const link = makeElement("a", "repair-attachment-link");
-              link.href = attachment.signedUrl;
-              link.target = "_blank";
-              link.rel = "noopener noreferrer";
-              link.setAttribute(
-                "aria-label",
-                `Open customer photo ${attachment.original_filename}`,
-              );
-              const image = makeElement("img", "repair-attachment-image");
-              image.src = attachment.signedUrl;
-              image.alt = attachment.original_filename;
-              image.loading = "lazy";
-              link.append(image);
-              gallery.append(link);
-            });
-          })
-          .catch((error) => {
-            console.error("Repair photo loading failed:", error);
-            if (detailPanel.dataset.repairId === record.id)
-              attachmentsField.querySelector("dd").textContent =
-                error.message || "Repair photos could not be loaded.";
-          });
-      }
-      detailPanel.hidden = false;
-      detailPanel.scrollIntoView({
-        behavior: reducedMotion.matches ? "auto" : "smooth",
-        block: "nearest",
-      });
+      if (record) renderRepairDetails(record);
     });
 
     const accessGate = document.querySelector("#admin-access-gate");

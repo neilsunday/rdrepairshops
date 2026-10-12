@@ -53,7 +53,8 @@ body {
 }
 button,
 input,
-select {
+select,
+textarea {
   color: inherit;
   font: inherit;
 }
@@ -63,6 +64,68 @@ a {
 }
 button {
   font: inherit;
+}
+
+.module-pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.record-editor {
+  width: min(100% - 2rem, 680px);
+  max-height: min(88vh, 900px);
+  padding: 0;
+  border: 1px solid var(--admin-border-strong);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+}
+.record-editor::backdrop {
+  background: rgb(0 0 0 / 58%);
+}
+.record-editor__form {
+  display: grid;
+  gap: 1.25rem;
+  padding: clamp(1.2rem, 3vw, 2rem);
+}
+.record-editor__form h2 {
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+.record-editor__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.editor-field {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--admin-muted);
+  font-size: 0.78rem;
+}
+.editor-field:has(textarea) {
+  grid-column: 1 / -1;
+}
+.editor-field input,
+.editor-field select,
+.editor-field textarea {
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 0;
+  background: var(--admin-page);
+  color: var(--admin-text);
+}
+.editor-field textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+.record-editor__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.7rem;
 }
 svg {
   display: block;
@@ -1136,6 +1199,16 @@ ol {
 }
 
 @media (max-width: 620px) {
+  .record-editor {
+    width: calc(100% - 1rem);
+    max-height: 94vh;
+  }
+  .record-editor__fields {
+    grid-template-columns: 1fr;
+  }
+  .editor-field:has(textarea) {
+    grid-column: auto;
+  }
   .login-layout {
     grid-template-columns: 1fr;
   }

@@ -27,6 +27,8 @@
   };
 
   const normalizeText = (value) => String(value ?? "");
+  const databaseError = (message, error) =>
+    new Error(`${message}: ${error?.message || "Unknown Supabase error."}`);
   const ensurePreviewData = async () => {
     if (previewData) return previewData;
     if (!previewMode)
@@ -157,6 +159,7 @@
     if (collection === "services") {
       return {
         id: record.id,
+        slug: record.slug,
         name: record.name,
         category: record.category,
         description: record.description,
@@ -223,6 +226,9 @@
             (row) => row.status === "ready_for_pickup",
           ).length,
         },
+        async getSettings() {
+          throw new Error("Preview mode is read-only.");
+        },
         repairs: previewList("repairs", { pageSize: 4 }).records,
         activity: previewList("activity", { pageSize: 5 }).records,
       };
@@ -269,7 +275,8 @@
         .eq("user_id", userId)
         .eq("role", "owner")
         .maybeSingle();
-      if (error) throw new Error("Owner authorization check failed.");
+      if (error)
+        throw databaseError("Owner authorization check failed", error);
       return Boolean(data);
     },
     async list(collection, options = {}) {
@@ -321,7 +328,9 @@
         query = client
           .from(source[0])
           .select("*", { count: "exact" })
-          .order(source[1], { ascending: false });
+          .order(source[1], {
+            ascending: collection === "services",
+          });
         const filterColumns =
           {
             customers: { accountStatus: "account_status" },
@@ -363,7 +372,7 @@
         offset,
         offset + pageSize - 1,
       );
-      if (error) throw new Error(`Could not load ${collection}.`);
+      if (error) throw databaseError(`Could not load ${collection}`, error);
       const records = data || [];
 
       if (collection === "repairs" && records.length) {
@@ -396,7 +405,10 @@
           ],
         );
         if (historyResult.error || noteResult.error || technicianResult.error)
-          throw new Error("Could not load repair details.");
+          throw databaseError(
+            "Could not load repair details",
+            historyResult.error || noteResult.error || technicianResult.error,
+          );
         const technicians = new Map(
           (technicianResult.data || []).map((row) => [row.id, row]),
         );
@@ -446,7 +458,10 @@
             : Promise.resolve({ data: [], error: null }),
         ]);
         if (mediaResult.error || serviceResult.error)
-          throw new Error("Could not load showcase relations.");
+          throw databaseError(
+            "Could not load showcase relations",
+            mediaResult.error || serviceResult.error,
+          );
         const mediaCounts = new Map();
         for (const row of mediaResult.data || [])
           mediaCounts.set(row.post_id, (mediaCounts.get(row.post_id) || 0) + 1);
@@ -474,7 +489,8 @@
           .from("owner_showcase_posts")
           .select("id,title")
           .in("id", postIds);
-        if (postError) throw new Error("Could not load comment post titles.");
+        if (postError)
+          throw databaseError("Could not load comment post titles", postError);
         const titleById = new Map(
           (posts || []).map((row) => [row.id, row.title]),
         );
@@ -502,7 +518,8 @@
               .select("id,display_name")
               .in("id", actorIds)
           : { data: [], error: null };
-        if (profileError) throw new Error("Could not load activity actors.");
+        if (profileError)
+          throw databaseError("Could not load activity actors", profileError);
         const actorNames = new Map(
           (profiles || []).map((row) => [row.id, row.display_name]),
         );
@@ -548,8 +565,9 @@
           .select("id", { count: "exact", head: true })
           .eq("status", "ready_for_pickup"),
       ]);
-      if (counts.some((result) => result.error))
-        throw new Error("Could not load overview metrics.");
+      const countError = counts.find((result) => result.error)?.error;
+      if (countError)
+        throw databaseError("Could not load overview metrics", countError);
       const [repairs, activity] = await Promise.all([
         this.list("repairs", { pageSize: 4 }),
         this.list("activity", { pageSize: 5 }),
@@ -566,6 +584,19 @@
         activity: activity.records,
       };
     },
+    async getSettings() {
+      const client = await window.AdminSupabaseClient.get();
+      const { data, error } = await client
+        .from("business_settings")
+        .select(
+          "business_name,public_phone,public_email,public_address,business_hours,notification_preferences,updated_at",
+        )
+        .eq("id", 1)
+        .maybeSingle();
+      if (error)
+        throw databaseError("Business settings could not be loaded", error);
+      return data;
+    },
     async createRepair(payload) {
       const client = await window.AdminSupabaseClient.get();
       const { data, error } = await client
@@ -573,7 +604,8 @@
         .insert(payload)
         .select("id,reference_number")
         .single();
-      if (error) throw new Error("Repair request could not be created.");
+      if (error)
+        throw databaseError("Repair request could not be created", error);
       return data;
     },
     async updateRepair(id, payload) {
@@ -586,6 +618,7 @@
         "model",
         "reported_issue",
         "service_id",
+        "service_name_snapshot",
         "status",
         "priority",
         "assigned_technician_id",
@@ -601,7 +634,7 @@
         .eq("id", id)
         .select("id,reference_number,status,priority,updated_at")
         .single();
-      if (error) throw new Error("Repair update was rejected.");
+      if (error) throw databaseError("Repair update was rejected", error);
       return data;
     },
     async addInternalNote(repairId, note, userId) {
@@ -611,7 +644,7 @@
         .insert({ repair_request_id: repairId, note, created_by: userId })
         .select("id")
         .single();
-      if (error) throw new Error("Internal note could not be saved.");
+      if (error) throw databaseError("Internal note could not be saved", error);
       return data;
     },
     async moderateComment(id, status, userId) {
@@ -628,7 +661,7 @@
         .eq("id", id)
         .select("id,status")
         .single();
-      if (error) throw new Error("Comment moderation was rejected.");
+      if (error) throw databaseError("Comment moderation was rejected", error);
       return data;
     },
     async createService(payload) {
@@ -638,11 +671,12 @@
         .insert(payload)
         .select("id,slug,name")
         .single();
-      if (error) throw new Error("Service could not be created.");
+      if (error) throw databaseError("Service could not be created", error);
       return data;
     },
     async updateService(id, payload) {
       const allowed = [
+        "slug",
         "name",
         "category",
         "description",
@@ -659,7 +693,7 @@
         .eq("id", id)
         .select("id,name,status,updated_at")
         .single();
-      if (error) throw new Error("Service update was rejected.");
+      if (error) throw databaseError("Service update was rejected", error);
       return data;
     },
     async createPost(payload) {
@@ -669,7 +703,8 @@
         .insert(payload)
         .select("id,title,status")
         .single();
-      if (error) throw new Error("Repair post could not be created.");
+      if (error)
+        throw databaseError("Repair post could not be created", error);
       return data;
     },
     async updatePost(id, payload) {
@@ -690,7 +725,7 @@
         .eq("id", id)
         .select("id,title,status,updated_at")
         .single();
-      if (error) throw new Error("Repair post update was rejected.");
+      if (error) throw databaseError("Repair post update was rejected", error);
       return data;
     },
     async markNotificationRead(id) {
@@ -701,7 +736,8 @@
         .eq("id", id)
         .select("id,read_at")
         .single();
-      if (error) throw new Error("Notification state could not be updated.");
+      if (error)
+        throw databaseError("Notification state could not be updated", error);
       return data;
     },
     async saveSettings(payload) {
@@ -711,7 +747,7 @@
         .upsert({ id: 1, ...payload }, { onConflict: "id" })
         .select("id,updated_at")
         .single();
-      if (error) throw new Error("Settings could not be saved.");
+      if (error) throw databaseError("Settings could not be saved", error);
       return data;
     },
   };

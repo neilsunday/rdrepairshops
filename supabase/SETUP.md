@@ -2,9 +2,11 @@
 
 ## Scope and Limitations
 
-This phase prepares the schema only. The workspace contains no Supabase SQL/configuration, and this assistant did not connect to or inspect the remote Supabase project. No SQL in this guide or in `migrations/001_initial_schema.sql` has been executed. The migration does not create credentials, provision an owner, configure Storage, or connect the frontend.
+The repository contains Supabase migrations and an owner dashboard configured to use the project's public publishable key. Local SQL files do not prove that migrations were applied to the remote project; the remote database was not inspected as part of this change. Confirm the actual migration state before relying on a module.
 
-The dashboard's preview adapter remains separate. It must not be replaced with a browser client that uses a service-role key. Supabase Auth, RLS, Storage policies, and a trusted Edge Function/server endpoint are still required before real operations or customer information can be used.
+The default dashboard uses Supabase Auth and the authenticated browser client. Owner authorization and row access must continue to be enforced by RLS; a service-role key must never be placed in browser code. The `?preview=1` dashboard is still isolated, synthetic, and read-only.
+
+The dashboard currently supports owner reads and writes for repair requests, services, showcase post text/status, comment moderation, notification read state, and business settings. Customer-directory and activity entries are read-only. The public site remains a static catalog; showcase media upload, private repair attachments, and anonymous repair intake are not implemented by the dashboard.
 
 ## Migration Order
 
@@ -12,9 +14,9 @@ The dashboard's preview adapter remains separate. It must not be replaced with a
 2. Run the read-only preflight queries below in the SQL Editor. Inspect any names that overlap the migration. The migration intentionally uses ordinary `CREATE` statements without `DROP`, `CREATE OR REPLACE`, or broad `IF NOT EXISTS`; a conflicting object should stop application for review.
 3. Review `migrations/001_initial_schema.sql` and confirm the project is a supported Supabase PostgreSQL version with the Supabase-managed `auth` schema and `anon`, `authenticated`, and `service_role` roles.
 4. In SQL Editor, paste and run the complete `001_initial_schema.sql` once. It uses an explicit transaction. If it fails, do not remove statements or rerun blindly; inspect the reported object/state, restore if appropriate, then prepare a reviewed follow-up migration.
-5. Confirm tables, RLS, policies, the helper function, and the Realtime publication entries using the verification checklist below.
-6. Create Storage buckets and Storage object policies in the separate Storage step. Database table RLS does not authorize Storage objects.
-7. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
+5. Confirm tables, RLS, policies, the helper function, and the owner views used by the dashboard using the verification checklist below.
+6. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
+7. Configure private Storage buckets and policies only if a separately reviewed upload flow is introduced. Database table RLS does not authorize Storage objects.
 
 ## Exact ordered manual checklist
 
@@ -28,7 +30,7 @@ The dashboard's preview adapter remains separate. It must not be replaced with a
 
 3. Apply migrations in dependency order.
    - Run `supabase/migrations/001_initial_schema.sql` first.
-   - Only after that is confirmed, run `supabase/migrations/002_owner_customer_directory.sql` if the owner customer directory is required for the dashboard.
+   - Only after that is confirmed, run `supabase/migrations/002_owner_customer_directory.sql`. The owner dashboard's Customers section depends on `public.owner_customer_directory`.
    - Do not run the SQL in a different order or with destructive resets.
 
 4. Create or invite the owner Auth account.
@@ -51,21 +53,11 @@ The dashboard's preview adapter remains separate. It must not be replaced with a
    - Do not embed a service-role key or any secret value in browser code.
    - If the project is not configured yet, leave the values empty and keep the admin UI in setup-required mode.
 
-8. Set up private Storage buckets and narrow policies.
-   - Create the `repair-attachments` and `showcase-media` buckets in the Storage dashboard.
-   - Review and apply only the narrowly scoped policies needed for owner access and customer-owned repair attachments.
-   - Keep object reads private by default and issue signed URLs only through a trusted backend/server flow when required.
-
-9. Enable only the required Realtime tables.
-   - Add only the approved tables to the `supabase_realtime` publication.
-   - Keep private tables out of publication until a reviewed access path is in place.
-   - Verify the dashboard uses the published tables only for the required owner-facing events.
-
-10. Validate customer and owner access paths.
+8. Validate customer and owner access paths.
     - Sign in as the provisioned owner and verify the dashboard loads only after authorization succeeds.
     - Test a customer-authenticated session and confirm it can only access its own records.
     - Confirm a non-owner customer cannot read admin-only data or internal notes.
-    - Confirm the owner can read admin-only tables and manage business settings in the approved admin flow.
+    - Confirm the owner can read admin-only tables and manage the supported records through the dashboard. The dashboard does not currently use Realtime.
 
 ### Read-only preflight queries
 

@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#f7f7f5" />
     <meta
       name="description"
-      content="R&D Cellphone Repair admin dashboard UI preview."
+      content="R&D Cellphone Repair owner dashboard."
     />
-    <title>Admin Preview | R&amp;D Cellphone Repair</title>
+    <title>Owner Dashboard | R&amp;D Cellphone Repair</title>
     <script src="./js/supabase-config.js"></script>
     <script src="./js/supabase-client.js"></script>
     <script src="./js/data-adapter.js"></script>
@@ -272,14 +272,6 @@
           >
             Sign out
           </button>
-          <button
-            class="topbar-signout"
-            id="admin-signout"
-            type="button"
-            hidden
-          >
-            Sign out
-          </button>
         </header>
 
         <main class="admin-main" id="admin-main">
@@ -295,8 +287,8 @@
           </div>
           <noscript>
             <p class="module-state module-state--error">
-              This dashboard preview requires JavaScript. No real data is
-              connected.
+              JavaScript is required to verify owner access and load dashboard
+              data.
             </p>
           </noscript>
           <div id="module-view-host" aria-live="polite" aria-busy="false"></div>
@@ -312,7 +304,7 @@
                 <p class="breadcrumb">Admin <span>/</span> Overview</p>
                 <h1 id="page-title">Overview</h1>
                 <p class="page-description">
-                  A sample view of the repair workflow.
+                  A live snapshot of the repair workflow.
                 </p>
               </div>
               <span class="data-label">MOCK DATA</span>

@@ -1,12 +1,12 @@
 # Admin Data Contracts
 
-This document defines the UI-facing contract for a future Supabase adapter. The current dashboard is an unprotected preview: `admin/js/preview-data.js` contains explicitly synthetic fixture records, and `admin/js/data-adapter.js` exposes read-only `list(collection)`. No writes, authentication, database access, or storage access are implemented.
+This document describes the live owner dashboard and the Supabase records it consumes. `admin/js/preview-data.js` remains an explicitly synthetic fixture source for `?preview=1`; the default dashboard uses Supabase Auth, the owner-only RLS policies, and the production adapter in `admin/js/data-adapter.js`.
 
 ## Adapter Boundary
 
-The UI consumes collections by stable module key and normalizes them to records shaped below. The preview adapter returns `{ mode: "preview", records: [...] }`. A future Supabase adapter should preserve this shape or introduce explicit typed mappers at the boundary. Do not put service-role credentials in browser code. Every query and mutation must be authorized by Supabase Auth and RLS; client-side visibility is not authorization.
+The UI consumes collections by stable module key and normalizes them to records shaped below. Both adapters return `{ mode, records, total, page, pageSize }`; the production adapter additionally reads overview metrics and business settings. Supported owner operations are repair request create/update, append-only internal notes, service create/update, showcase post create/update, comment moderation, notification read state, and settings save. Customer directory and activity log entries are read-only. Do not put service-role credentials in browser code. Every query and mutation must be authorized by Supabase Auth and RLS; client-side visibility is not authorization.
 
-Expected future operations are `list`, `getById`, and validated `create`/`update` methods for supported modules. Destructive operations should be explicit, audited, and require confirmation. Do not show a success state until the backend confirms the operation. UI states are loading, empty, error, filtered no-results, validation error, confirmation, and operation success. The current preview can show loading/empty/error/filter states, but cannot truthfully complete writes.
+The dashboard deliberately has no direct customer deletion, role assignment, Storage upload, or anonymous public repair intake. Those require reviewed data-retention, authorization, and private Storage flows beyond this UI contract. Do not show a success state until the backend confirms the operation. UI states include loading, empty, error, filtered no-results, validation error, and operation success. Preview mode remains read-only.
 
 ## Relationships and Fields
 

@@ -9,7 +9,7 @@
     overview: {
       title: "Overview",
       description:
-        "A snapshot of the repair workflow using isolated demo records.",
+        "A live snapshot of the repair workflow.",
     },
     repairs: {
       title: "Repair Management",
@@ -80,11 +80,10 @@
         ["repairCount", "Repairs"],
         ["accountStatus", "Profile status"],
       ],
-      cta: "Add customer",
     },
     posts: {
       title: "Repair Posts / Showcase",
-      description: "Prepare repair documentation for a future public showcase.",
+      description: "Manage repair documentation for the public showcase.",
       collection: "posts",
       search: ["title", "serviceName"],
       filters: [
@@ -126,8 +125,7 @@
     },
     services: {
       title: "Services",
-      description:
-        "Review service names and publication state before connecting the public catalog.",
+      description: "Manage the services shown in the public catalog.",
       collection: "services",
       search: ["name", "category"],
       filters: [
@@ -147,8 +145,7 @@
     },
     notifications: {
       title: "Notifications",
-      description:
-        "Owner notifications associated with sample workflow events.",
+      description: "Review owner notifications and mark them as read.",
       collection: "notifications",
       search: ["title", "detail"],
       filters: [
@@ -164,7 +161,7 @@
     },
     activity: {
       title: "Activity Logs",
-      description: "A review-only timeline of example administrative events.",
+      description: "Review the administrative activity audit trail.",
       collection: "activity",
       search: ["actor", "action", "target"],
       columns: [
@@ -176,8 +173,7 @@
     },
     settings: {
       title: "Settings",
-      description:
-        "Business and notification settings are not connected in this preview.",
+      description: "Manage the public business profile and owner preferences.",
     },
   };
 
@@ -217,6 +213,7 @@
       const loginIntro = document.querySelector("#login-intro");
       const loginHint = document.querySelector("#login-hint");
       const loginModeLabel = document.querySelector("#login-mode-label");
+      const loginEyebrow = document.querySelector("#login-eyebrow");
       const loginSubmit = loginForm.querySelector('[type="submit"]');
       const supabaseConfig = window.AdminSupabaseClient;
 
@@ -231,17 +228,20 @@
         loginHint.textContent =
           "This preview does not send or store entered credentials.";
         loginModeLabel.textContent = "PREVIEW / NO AUTH";
+        loginEyebrow.lastChild.textContent = " OWNER AREA / PREVIEW";
       } else if (!supabaseConfig?.isConfigured()) {
         loginIntro.textContent =
           "Supabase is not configured. Sign-in is unavailable until project settings are supplied.";
         loginHint.textContent =
           "Credentials are submitted only to Supabase Auth after configuration.";
         loginModeLabel.textContent = "SETUP REQUIRED";
+        loginEyebrow.lastChild.textContent = " OWNER AREA / SETUP REQUIRED";
       } else {
         loginIntro.textContent =
           "Sign in with the owner account provisioned in Supabase Auth.";
         loginHint.textContent =
           "Authentication is handled by Supabase. This page does not store your password.";
+        loginEyebrow.lastChild.textContent = " OWNER AREA / LIVE AUTH";
       }
 
       passwordToggle.addEventListener("click", () => {
@@ -304,7 +304,8 @@
             "info",
           );
           window.location.replace(new URL("../", window.location.href).href);
-        } catch {
+        } catch (error) {
+          console.error("Owner sign-in failed:", error);
           setLoginStatus(
             "Sign-in is temporarily unavailable. Check the Supabase configuration and try again.",
           );
@@ -325,7 +326,9 @@
               );
             }
           })
-          .catch(() => {});
+            .catch((error) => {
+              console.error("Existing owner session could not be verified:", error);
+            });
       }
     }
 
@@ -343,6 +346,19 @@
     );
     let activeModule = "overview";
     let activeRecords = [];
+    let activePage = 0;
+    let activeTotal = 0;
+    let currentUserId = null;
+    const moduleQueryState = new Map();
+    let searchTimer;
+
+    const isProduction = () =>
+      window.AdminDataAdapter?.mode === "production";
+    const getQueryState = (moduleKey) => {
+      if (!moduleQueryState.has(moduleKey))
+        moduleQueryState.set(moduleKey, { search: "", filters: {} });
+      return moduleQueryState.get(moduleKey);
+    };
 
     document
       .querySelectorAll(".admin-view")
@@ -399,7 +415,11 @@
       );
       heading.append(
         copy,
-        makeElement("span", "data-label", "DEMO PREVIEW DATA"),
+        makeElement(
+          "span",
+          "data-label",
+          isProduction() ? "LIVE SUPABASE DATA" : "DEMO PREVIEW DATA",
+        ),
       );
       return heading;
     };
@@ -411,7 +431,7 @@
         makeElement(
           "caption",
           "visually-hidden",
-          `${definition.title} preview records`,
+          `${definition.title} records`,
         ),
       );
       const head = document.createElement("thead");
@@ -421,7 +441,7 @@
         th.scope = "col";
         headerRow.append(th);
       });
-      if (definition.action && includeAction) {
+      if ((definition.action || definition.cta) && includeAction) {
         const th = makeElement("th", "", "Actions");
         th.scope = "col";
         headerRow.append(th);
@@ -447,29 +467,48 @@
           }
           row.append(cell);
         });
-        if (definition.action && includeAction) {
+        if ((definition.action || definition.cta) && includeAction) {
           const actionCell = document.createElement("td");
-          const label =
-            definition.action === "details"
-              ? "View details"
-              : definition.action === "moderation"
-                ? "Review"
-                : "Mark read";
-          const action = makeElement("button", "table-action", label);
-          action.type = "button";
           if (definition.action === "details") {
+            const action = makeElement("button", "table-action", "View details");
+            action.type = "button";
             action.dataset.recordAction = "details";
             action.dataset.recordId = record.id;
             action.setAttribute(
               "aria-label",
               `View repair details for ${record.reference}`,
             );
-          } else {
-            action.disabled = true;
-            action.title =
-              "Unavailable until authenticated data operations are connected";
+            actionCell.append(action);
           }
-          actionCell.append(action);
+          if (definition.action === "moderation") {
+            const action = makeElement("button", "table-action", "Review");
+            action.type = "button";
+            action.disabled = !isProduction();
+            action.dataset.recordAction = "edit";
+            action.dataset.recordId = record.id;
+            if (!isProduction())
+              action.title = "Moderation is disabled in demo preview mode";
+            actionCell.append(action);
+          }
+          if (definition.action === "notification") {
+            const action = makeElement(
+              "button",
+              "table-action",
+              record.status === "unread" ? "Mark read" : "Read",
+            );
+            action.type = "button";
+            action.disabled = !isProduction() || record.status === "read";
+            action.dataset.recordAction = "mark-read";
+            action.dataset.recordId = record.id;
+            actionCell.append(action);
+          }
+          if (definition.cta && isProduction()) {
+            const action = makeElement("button", "table-action", "Edit");
+            action.type = "button";
+            action.dataset.recordAction = "edit";
+            action.dataset.recordId = record.id;
+            actionCell.append(action);
+          }
           row.append(actionCell);
         }
         body.append(row);
@@ -485,7 +524,11 @@
       const panelHeading = makeElement("div", "panel-heading");
       const titleGroup = document.createElement("div");
       titleGroup.append(
-        makeElement("p", "panel-eyebrow", "ISOLATED FIXTURE RECORDS"),
+        makeElement(
+          "p",
+          "panel-eyebrow",
+          isProduction() ? "OWNER RECORDS" : "ISOLATED FIXTURE RECORDS",
+        ),
       );
       const panelTitle = makeElement("h2", "", definition.title);
       panelTitle.id = "module-panel-title";
@@ -498,9 +541,11 @@
           definition.cta,
         );
         button.type = "button";
-        button.disabled = true;
-        button.title =
-          "Unavailable until Supabase and owner authorization are connected";
+        button.disabled = !isProduction();
+        button.dataset.createRecord = activeModule;
+        button.title = isProduction()
+          ? ""
+          : "Writes are disabled in demo preview mode";
         button.setAttribute("aria-describedby", "module-action-note");
         panelHeading.append(button);
       }
@@ -509,7 +554,9 @@
         makeElement(
           "p",
           "panel-note",
-          "Synthetic demo data only. No records are stored or changed.",
+          isProduction()
+            ? "Changes are saved to Supabase after you confirm each form."
+            : "Synthetic demo data only. No records are stored or changed.",
         ),
       );
       const controls = makeElement("div", "module-controls");
@@ -539,6 +586,7 @@
         input.dataset.moduleSearch = "true";
         input.placeholder = `Search ${definition.title.toLowerCase()}`;
         input.autocomplete = "off";
+        input.value = getQueryState(activeModule).search;
         searchLabel.append(icon, input);
         controls.append(searchLabel);
       }
@@ -557,6 +605,7 @@
           option.textContent = formatValue(filter.key, value);
           select.append(option);
         });
+        select.value = getQueryState(activeModule).filters[filter.key] || "all";
         label.append(select);
         controls.append(label);
       });
@@ -567,7 +616,11 @@
       count.setAttribute("aria-live", "polite");
       count.setAttribute("aria-atomic", "true");
       panel.append(count);
-      const loading = makeElement("p", "module-state", "Loading preview data…");
+      const loading = makeElement(
+        "p",
+        "module-state",
+        isProduction() ? "Loading records…" : "Loading preview data…",
+      );
       loading.dataset.moduleState = "loading";
       loading.setAttribute("role", "status");
       const error = makeElement("div", "module-state module-state--error");
@@ -577,7 +630,7 @@
       const empty = makeElement(
         "p",
         "module-state",
-        `No ${definition.title.toLowerCase()} records are available in this preview.`,
+        `No ${definition.title.toLowerCase()} records are available.`,
       );
       empty.dataset.moduleState = "empty";
       empty.hidden = true;
@@ -590,20 +643,31 @@
       noResults.hidden = true;
       const tableHost = makeElement("div", "module-table-host");
       panel.append(loading, error, empty, noResults, tableHost);
+      const pagination = makeElement("div", "module-pagination");
+      pagination.dataset.modulePagination = "true";
+      panel.append(pagination);
       const actionNote = makeElement(
         "p",
         "module-action-note",
-        "Data changes, moderation decisions, and destructive actions are disabled in this preview.",
+        isProduction()
+          ? "Customer records are read-only. Repair, service, post, moderation, notification, and settings actions are saved to Supabase."
+          : "Data changes, moderation decisions, and destructive actions are disabled in this preview.",
       );
       actionNote.id = "module-action-note";
       panel.append(actionNote);
       return panel;
     };
 
-    const renderSettings = () => {
+    const renderSettings = (settings = null) => {
       const panel = makeElement("section", "panel module-panel settings-panel");
       panel.setAttribute("aria-labelledby", "settings-panel-title");
-      panel.append(makeElement("p", "panel-eyebrow", "NOT CONNECTED"));
+      panel.append(
+        makeElement(
+          "p",
+          "panel-eyebrow",
+          isProduction() ? "BUSINESS PROFILE" : "PREVIEW ONLY",
+        ),
+      );
       const title = makeElement("h2", "", "Business profile and preferences");
       title.id = "settings-panel-title";
       panel.append(
@@ -611,41 +675,46 @@
         makeElement(
           "p",
           "panel-note",
-          "These fields describe the future settings contract. Inputs are disabled because no settings service is connected.",
+          isProduction()
+            ? "These details are stored in the owner-only business settings record."
+            : "Settings are read-only in the isolated demo preview.",
         ),
       );
       const form = document.createElement("form");
       form.className = "settings-form";
-      form.addEventListener("submit", (event) => event.preventDefault());
       [
-        ["Business name", "Public-facing shop name"],
-        ["Phone number", "Public contact phone"],
-        ["Email address", "Public contact email"],
-        ["Address", "Public shop address"],
-        ["Business hours", "Public business hours"],
-      ].forEach(([name, placeholder]) => {
+        ["Business name", "business_name", "Public-facing shop name", "text"],
+        ["Phone number", "public_phone", "Public contact phone", "tel"],
+        ["Email address", "public_email", "Public contact email", "email"],
+        ["Address", "public_address", "Public shop address", "text"],
+        ["Business hours", "business_hours", "Public business hours", "text"],
+      ].forEach(([name, key, placeholder, type]) => {
         const label = makeElement("label", "settings-field");
         label.append(makeElement("span", "", name));
         const input = document.createElement("input");
-        input.name = name.toLowerCase().replaceAll(" ", "_");
+        input.name = key;
+        input.type = type;
         input.placeholder = placeholder;
-        input.disabled = true;
+        input.value = settings?.[key] || "";
+        input.disabled = !isProduction();
         label.append(input);
         form.append(label);
       });
       const preferences = makeElement("fieldset", "settings-preferences");
-      preferences.disabled = true;
+      preferences.disabled = !isProduction();
       const legend = document.createElement("legend");
       legend.textContent = "Notification preferences";
       preferences.append(legend);
       [
-        "Repair request updates",
-        "Comment moderation alerts",
-        "Administrative activity alerts",
-      ].forEach((text) => {
+        ["email_repairs", "Repair request updates"],
+        ["email_comments", "Comment moderation alerts"],
+        ["email_activity", "Administrative activity alerts"],
+      ].forEach(([key, text]) => {
         const label = makeElement("label", "settings-checkbox");
         const input = document.createElement("input");
         input.type = "checkbox";
+        input.name = key;
+        input.checked = settings?.notification_preferences?.[key] === true;
         label.append(input, document.createTextNode(text));
         preferences.append(label);
       });
@@ -656,18 +725,14 @@
         "Save settings",
       );
       save.type = "submit";
-      save.disabled = true;
-      save.title =
-        "Unavailable until authenticated settings storage is connected";
-      form.append(save);
-      panel.append(
-        form,
-        makeElement(
-          "p",
-          "module-action-note",
-          "Settings are not saved or persisted in this preview.",
-        ),
-      );
+      save.disabled = !isProduction();
+      const status = makeElement("p", "form-status", "");
+      status.dataset.settingsStatus = "true";
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      form.dataset.settingsForm = "true";
+      form.append(save, status);
+      panel.append(form);
       return panel;
     };
 
@@ -683,7 +748,9 @@
           makeElement(
             "p",
             "view-footnote",
-            "Future settings fields are documented in admin/DATA-CONTRACTS.md.",
+            isProduction()
+              ? "Settings are stored in Supabase and are visible to the public website only where explicitly connected."
+              : "Preview settings are not saved.",
           ),
         );
       } else {
@@ -702,36 +769,13 @@
           makeElement(
             "p",
             "view-footnote",
-            "All displayed records are isolated demo fixtures. No real customer data or operations are connected.",
+            isProduction()
+              ? "Records shown here are read from the connected Supabase project. Customer and activity records remain read-only."
+              : "All displayed records are isolated demo fixtures. No real customer data or operations are connected.",
           ),
         );
       }
       return view;
-    };
-
-    const getFilteredRecords = (definition, records, panel) => {
-      const query =
-        panel
-          .querySelector("[data-module-search]")
-          ?.value.trim()
-          .toLowerCase() || "";
-      return records.filter((record) => {
-        const matchesSearch =
-          !query ||
-          definition.search.some((key) =>
-            String(record[key] ?? "")
-              .toLowerCase()
-              .includes(query),
-          );
-        const matchesFilters = [
-          ...panel.querySelectorAll("[data-module-filter]"),
-        ].every(
-          (select) =>
-            select.value === "all" ||
-            String(record[select.dataset.moduleFilter]) === select.value,
-        );
-        return matchesSearch && matchesFilters;
-      });
     };
 
     const renderFilteredTable = (moduleKey) => {
@@ -740,50 +784,52 @@
         `[data-admin-view="${moduleKey}"] .module-panel`,
       );
       if (!panel) return;
-      const filtered = getFilteredRecords(definition, activeRecords, panel);
-      const hasFilters =
-        Boolean(panel.querySelector("[data-module-search]")?.value.trim()) ||
-        [...panel.querySelectorAll("[data-module-filter]")].some(
-          (select) => select.value !== "all",
+      const filtered = activeRecords;
+      const hasFilters = Boolean(getQueryState(moduleKey).search) ||
+        Object.values(getQueryState(moduleKey).filters).some(
+          (value) => value && value !== "all",
         );
       panel.querySelector('[data-module-state="loading"]').hidden = true;
       panel.querySelector('[data-module-state="error"]').hidden = true;
       panel.querySelector('[data-module-state="empty"]').hidden =
-        activeRecords.length > 0;
+        activeTotal > 0 || hasFilters;
       panel.querySelector('[data-module-state="no-results"]').hidden =
-        activeRecords.length === 0 || filtered.length > 0 || !hasFilters;
+        activeTotal > 0 || !hasFilters;
       panel.querySelector("#module-record-count").textContent =
-        `Showing ${filtered.length} of ${activeRecords.length} demo ${definition.title.toLowerCase()} records`;
+        activeTotal
+          ? `Showing ${activePage * 25 + 1}-${activePage * 25 + filtered.length} of ${activeTotal} ${definition.title.toLowerCase()} records`
+          : `0 ${definition.title.toLowerCase()} records`;
       const tableHost = panel.querySelector(".module-table-host");
       tableHost.replaceChildren();
       if (filtered.length) tableHost.append(createTable(definition, filtered));
+      const pagination = panel.querySelector("[data-module-pagination]");
+      pagination.replaceChildren();
+      if (activeTotal > 25) {
+        const previous = makeElement("button", "admin-button", "Previous");
+        previous.type = "button";
+        previous.dataset.pageChange = String(activePage - 1);
+        previous.disabled = activePage === 0;
+        const next = makeElement("button", "admin-button", "Next");
+        next.type = "button";
+        next.dataset.pageChange = String(activePage + 1);
+        next.disabled = (activePage + 1) * 25 >= activeTotal;
+        pagination.append(previous, next);
+      }
     };
 
-    const renderOverview = (repairs, activity) => {
+    const renderOverview = (overview) => {
       const view = host.querySelector('[data-admin-view="overview"]');
       const metrics = makeElement("section", "metric-grid");
-      metrics.setAttribute("aria-label", "Demo repair metrics");
+      const production = overview.mode === "production";
+      metrics.setAttribute(
+        "aria-label",
+        production ? "Repair metrics" : "Demo repair metrics",
+      );
       const metricDefinitions = [
-        [
-          "Open requests",
-          repairs.filter(
-            (record) => !["completed", "cancelled"].includes(record.status),
-          ).length,
-        ],
-        [
-          "Awaiting approval",
-          repairs.filter((record) => record.status === "awaiting_approval")
-            .length,
-        ],
-        [
-          "In progress",
-          repairs.filter((record) => record.status === "in_progress").length,
-        ],
-        [
-          "Ready for pickup",
-          repairs.filter((record) => record.status === "ready_for_pickup")
-            .length,
-        ],
+        ["Open requests", overview.metrics.open],
+        ["Awaiting approval", overview.metrics.awaitingApproval],
+        ["In progress", overview.metrics.inProgress],
+        ["Ready for pickup", overview.metrics.readyForPickup],
       ];
       metricDefinitions.forEach(([label, value]) => {
         const item = makeElement("article", "metric-item");
@@ -794,7 +840,11 @@
             "metric-item__value",
             String(value).padStart(2, "0"),
           ),
-          makeElement("p", "metric-item__note", "Demo fixture count"),
+          makeElement(
+            "p",
+            "metric-item__note",
+            production ? "Live request count" : "Demo fixture count",
+          ),
         );
         metrics.append(item);
       });
@@ -803,7 +853,11 @@
       const panelHeading = makeElement("div", "panel-heading");
       const titleGroup = document.createElement("div");
       titleGroup.append(
-        makeElement("p", "panel-eyebrow", "DEMO FIXTURES"),
+        makeElement(
+          "p",
+          "panel-eyebrow",
+          production ? "LATEST RECORDS" : "DEMO FIXTURES",
+        ),
         makeElement("h2", "", "Recent repair requests"),
       );
       const viewAll = makeElement(
@@ -819,20 +873,34 @@
         makeElement(
           "p",
           "panel-note",
-          "Synthetic records only; no customer data is connected.",
+          production
+            ? "The latest repair requests in your shop."
+            : "Synthetic records only; no customer data is connected.",
         ),
       );
       recentPanel.append(
-        createTable(moduleDefinitions.repairs, repairs.slice(0, 4), false),
+        createTable(moduleDefinitions.repairs, overview.repairs, false),
       );
       const activityPanel = makeElement("section", "panel");
       activityPanel.append(
-        makeElement("p", "panel-eyebrow", "DEMO FIXTURES"),
+        makeElement(
+          "p",
+          "panel-eyebrow",
+          production ? "AUDIT TRAIL" : "DEMO FIXTURES",
+        ),
         makeElement("h2", "", "Recent activity"),
-        makeElement("p", "panel-note", "No real activity has been performed."),
+        makeElement(
+          "p",
+          "panel-note",
+          production
+            ? overview.activity.length
+              ? "Recent owner and system actions."
+              : "No activity has been recorded yet."
+            : "No real activity has been performed.",
+        ),
       );
       const list = makeElement("ol", "activity-list");
-      activity.slice(0, 5).forEach((record) => {
+      overview.activity.slice(0, 5).forEach((record) => {
         const item = document.createElement("li");
         item.append(makeElement("span", "activity-marker"));
         const copy = document.createElement("div");
@@ -852,16 +920,26 @@
         makeElement(
           "p",
           "view-footnote",
-          "All values are derived from synthetic demo fixtures and are not shop records.",
+          production
+            ? "Overview values are loaded from the connected Supabase project."
+            : "All values are derived from synthetic demo fixtures and are not shop records.",
         ),
       );
     };
 
-    const loadModule = async (moduleKey) => {
+    let moduleLoadId = 0;
+    const loadModule = async (moduleKey, page = 0) => {
       const definition = moduleDefinitions[moduleKey];
       if (!definition) return;
+      const loadId = ++moduleLoadId;
+      window.clearTimeout(searchTimer);
+      const isNewModule =
+        activeModule !== moduleKey ||
+        !host.querySelector(`[data-admin-view="${moduleKey}"]`);
       activeModule = moduleKey;
+      activePage = Math.max(0, page);
       activeRecords = [];
+      activeTotal = 0;
       setSidebarOpen(false);
       navItems.forEach((item) => {
         const isActive = item.dataset.viewTarget === moduleKey;
@@ -870,59 +948,447 @@
         else item.removeAttribute("aria-current");
       });
       breadcrumb.textContent = definition.title;
-      host.replaceChildren(renderModuleShell(moduleKey));
+      if (isNewModule) host.replaceChildren(renderModuleShell(moduleKey));
       host.setAttribute("aria-busy", "true");
-      if (moduleKey === "settings") {
-        host.setAttribute("aria-busy", "false");
-        return;
-      }
+      const panel = host.querySelector(".module-panel");
+      panel?.querySelector('[data-module-state="loading"]')?.removeAttribute("hidden");
+      panel?.querySelector('[data-module-state="error"]')?.setAttribute("hidden", "");
       try {
         if (moduleKey === "overview") {
-          const [repairs, activity] = await Promise.all([
-            window.AdminDataAdapter.list("repairs"),
-            window.AdminDataAdapter.list("activity"),
-          ]);
-          if (activeModule !== moduleKey) return;
-          renderOverview(repairs.records, activity.records);
-        } else {
-          const result = await window.AdminDataAdapter.list(
-            definition.collection,
-          );
-          if (activeModule !== moduleKey) return;
-          if (result.mode !== "preview")
-            throw new Error("Unexpected data source mode.");
-          activeRecords = result.records;
-          renderFilteredTable(moduleKey);
-        }
-      } catch {
-        if (activeModule !== moduleKey) return;
-        const panel = host.querySelector(".module-panel");
-        const error = panel?.querySelector('[data-module-state="error"]');
-        if (panel && error) {
-          panel.querySelector('[data-module-state="loading"]').hidden = true;
-          error.append(
+          const overview = await window.AdminDataAdapter.overview();
+          if (loadId !== moduleLoadId) return;
+          renderOverview(overview);
+        } else if (moduleKey === "settings") {
+          const settings = isProduction()
+            ? await window.AdminDataAdapter.getSettings()
+            : null;
+          if (loadId !== moduleLoadId) return;
+          const view = host.querySelector('[data-admin-view="settings"]');
+          view.replaceChildren(
+            makeHeading(definition),
+            renderSettings(settings),
             makeElement(
               "p",
-              "",
-              "Dashboard data could not be loaded. Check your session and owner access, then try again.",
+              "view-footnote",
+              "Settings are available only to the verified owner account.",
             ),
           );
+        } else {
+          const queryState = getQueryState(moduleKey);
+          const result = await window.AdminDataAdapter.list(
+            definition.collection,
+            {
+              page: activePage,
+              pageSize: 25,
+              search: queryState.search,
+              filters: queryState.filters,
+            },
+          );
+          if (loadId !== moduleLoadId) return;
+          if (result.mode !== window.AdminDataAdapter.mode)
+            throw new Error("Unexpected data source mode.");
+          activeRecords = result.records;
+          activeTotal = result.total;
+          renderFilteredTable(moduleKey);
+        }
+      } catch (error) {
+        if (loadId !== moduleLoadId) return;
+        console.error("Admin module load failed:", error);
+        const currentPanel = host.querySelector(".module-panel");
+        const errorState = currentPanel?.querySelector('[data-module-state="error"]');
+        if (currentPanel && errorState) {
+          currentPanel.querySelector('[data-module-state="loading"]').hidden = true;
+          errorState.replaceChildren(makeElement("p", "", error.message));
           const retry = makeElement("button", "admin-button", "Retry loading");
           retry.type = "button";
           retry.dataset.retryModule = moduleKey;
-          error.append(retry);
-          error.hidden = false;
+          errorState.append(retry);
+          errorState.hidden = false;
         } else {
           host.replaceChildren(
             makeElement(
               "p",
               "module-state module-state--error",
-              "Dashboard data could not be loaded. Check your session and owner access, then try again.",
+              error.message || "Dashboard data could not be loaded.",
             ),
           );
         }
       } finally {
-        if (activeModule === moduleKey) host.setAttribute("aria-busy", "false");
+        if (loadId === moduleLoadId) host.setAttribute("aria-busy", "false");
+      }
+    };
+
+    const addEditorField = (
+      form,
+      { key, label, value = "", type = "text", required = false, rows },
+    ) => {
+      const wrapper = makeElement("label", "editor-field");
+      wrapper.append(makeElement("span", "", label));
+      const input = rows
+        ? document.createElement("textarea")
+        : document.createElement("input");
+      input.name = key;
+      if (!rows) input.type = type;
+      if (rows) input.rows = rows;
+      input.value = value ?? "";
+      input.required = required;
+      wrapper.append(input);
+      form.append(wrapper);
+      return input;
+    };
+
+    const addEditorSelect = (form, { key, label, options, value }) => {
+      const wrapper = makeElement("label", "editor-field");
+      wrapper.append(makeElement("span", "", label));
+      const select = document.createElement("select");
+      select.name = key;
+      options.forEach(([optionValue, optionLabel]) => {
+        const option = document.createElement("option");
+        option.value = optionValue;
+        option.textContent = optionLabel;
+        option.selected = String(optionValue) === String(value ?? "");
+        select.append(option);
+      });
+      wrapper.append(select);
+      form.append(wrapper);
+      return select;
+    };
+
+    const openEditor = async (moduleKey, record = null) => {
+      if (!isProduction()) return;
+      const definition = moduleDefinitions[moduleKey];
+      const dialog = document.createElement("dialog");
+      dialog.className = "record-editor";
+      const form = document.createElement("form");
+      form.className = "record-editor__form";
+      form.noValidate = false;
+      const entityName = {
+        repairs: "repair request",
+        services: "service",
+        posts: "showcase post",
+        comments: "comment",
+      }[moduleKey];
+      const title = makeElement(
+        "h2",
+        "",
+        `${record ? "Edit" : "Create"} ${entityName}`,
+      );
+      const fields = makeElement("div", "record-editor__fields");
+      const status = makeElement("p", "form-status", "");
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      let services = [];
+
+      if (["repairs", "posts"].includes(moduleKey)) {
+        const result = await window.AdminDataAdapter.list("services", {
+          pageSize: 100,
+          filters: moduleKey === "repairs" ? { status: "active" } : {},
+        });
+        services = result.records;
+      }
+
+      if (moduleKey === "repairs") {
+        [
+          ["customer_name", "Customer name", "customerName", "text", true],
+          ["customer_email", "Email", "customerEmail", "email", false],
+          ["customer_phone", "Phone", "customerPhone", "tel", false],
+          ["device_type", "Device type", "deviceType", "text", true],
+          ["brand", "Brand", "brand", "text", true],
+          ["model", "Model", "model", "text", true],
+          ["reported_issue", "Reported issue", "reportedIssue", "text", true],
+        ].forEach(([key, label, source, type, required]) =>
+          addEditorField(fields, {
+            key,
+            label,
+            type,
+            required,
+            value: record?.[source] || "",
+            rows: key === "reported_issue" ? 4 : undefined,
+          }),
+        );
+        addEditorSelect(fields, {
+          key: "service_id",
+          label: "Service",
+          options: [
+            ["", "Other / not listed"],
+            ...services.map((service) => [service.id, service.name]),
+          ],
+          value: record?.serviceId || "",
+        });
+        if (record) {
+          addEditorSelect(fields, {
+            key: "status",
+            label: "Repair status",
+            options: [
+              "submitted",
+              "inspecting",
+              "awaiting_approval",
+              "approved",
+              "in_progress",
+              "ready_for_pickup",
+              "completed",
+              "cancelled",
+            ].map((value) => [value, formatValue("status", value)]),
+            value: record.status,
+          });
+          addEditorSelect(fields, {
+            key: "priority",
+            label: "Priority",
+            options: ["low", "normal", "high", "urgent"].map((value) => [
+              value,
+              formatValue("priority", value),
+            ]),
+            value: record.priority,
+          });
+          addEditorField(fields, {
+            key: "customer_visible_note",
+            label: "Customer-visible update",
+            value: record.customerVisibleNotes,
+            rows: 3,
+          });
+          addEditorField(fields, {
+            key: "internal_note",
+            label: "Add internal note",
+            rows: 3,
+          });
+        }
+      } else if (moduleKey === "services") {
+        addEditorField(fields, {
+          key: "name",
+          label: "Service name",
+          value: record?.name,
+          required: true,
+        });
+        addEditorField(fields, {
+          key: "slug",
+          label: "URL slug",
+          value: record?.slug,
+          required: true,
+        });
+        addEditorField(fields, {
+          key: "category",
+          label: "Category",
+          value: record?.category,
+          required: true,
+        });
+        addEditorField(fields, {
+          key: "description",
+          label: "Description",
+          value: record?.description,
+          rows: 4,
+        });
+        addEditorSelect(fields, {
+          key: "status",
+          label: "Visibility",
+          options: ["active", "draft", "inactive"].map((value) => [
+            value,
+            formatValue("status", value),
+          ]),
+          value: record?.status || "active",
+        });
+        addEditorField(fields, {
+          key: "sort_order",
+          label: "Display order",
+          type: "number",
+          value: record?.sortOrder ?? 0,
+        });
+      } else if (moduleKey === "posts") {
+        addEditorField(fields, {
+          key: "title",
+          label: "Title",
+          value: record?.title,
+          required: true,
+        });
+        addEditorField(fields, {
+          key: "caption",
+          label: "Caption",
+          value: record?.caption,
+          rows: 5,
+        });
+        addEditorSelect(fields, {
+          key: "service_id",
+          label: "Related service",
+          options: [
+            ["", "Not linked"],
+            ...services.map((service) => [service.id, service.name]),
+          ],
+          value: record?.serviceId || "",
+        });
+        addEditorSelect(fields, {
+          key: "status",
+          label: "Publication status",
+          options: ["draft", "published", "archived"].map((value) => [
+            value,
+            formatValue("status", value),
+          ]),
+          value: record?.status || "draft",
+        });
+      } else if (moduleKey === "comments") {
+        addEditorField(fields, {
+          key: "body",
+          label: "Comment",
+          value: record.body,
+          rows: 4,
+        }).readOnly = true;
+        addEditorSelect(fields, {
+          key: "status",
+          label: "Moderation decision",
+          options: ["approved", "rejected", "hidden"].map((value) => [
+            value,
+            formatValue("status", value),
+          ]),
+          value: ["approved", "rejected", "hidden"].includes(record.status)
+            ? record.status
+            : "approved",
+        });
+      }
+
+      const actions = makeElement("div", "record-editor__actions");
+      const cancel = makeElement("button", "admin-button", "Cancel");
+      cancel.type = "button";
+      cancel.addEventListener("click", () => dialog.close());
+      const save = makeElement(
+        "button",
+        "admin-button admin-button--primary",
+        "Save",
+      );
+      save.type = "submit";
+      actions.append(cancel, save);
+      form.append(title, fields, status, actions);
+      dialog.append(form);
+      document.body.append(dialog);
+      dialog.addEventListener("close", () => dialog.remove(), { once: true });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!form.reportValidity()) return;
+        const values = Object.fromEntries(new FormData(form));
+        save.disabled = true;
+        status.textContent = "Saving…";
+        try {
+          if (moduleKey === "repairs") {
+            if (!values.customer_email.trim() && !values.customer_phone.trim()) {
+              status.textContent =
+                "Enter at least one customer contact method: email or phone.";
+              save.disabled = false;
+              return;
+            }
+            const selectedService = services.find(
+              (service) => service.id === values.service_id,
+            );
+            const payload = {
+              customer_name: values.customer_name.trim(),
+              customer_email: values.customer_email.trim() || null,
+              customer_phone: values.customer_phone.trim() || null,
+              device_type: values.device_type.trim(),
+              brand: values.brand.trim(),
+              model: values.model.trim(),
+              reported_issue: values.reported_issue.trim(),
+              service_id: values.service_id || null,
+              service_name_snapshot:
+                selectedService?.name || "Other / not listed",
+            };
+            if (record) {
+              payload.status = values.status;
+              payload.priority = values.priority;
+              payload.customer_visible_note =
+                values.customer_visible_note.trim() || null;
+              await window.AdminDataAdapter.updateRepair(record.id, payload);
+              if (values.internal_note.trim()) {
+                try {
+                  await window.AdminDataAdapter.addInternalNote(
+                    record.id,
+                    values.internal_note.trim(),
+                    currentUserId,
+                  );
+                } catch {
+                  status.textContent =
+                    "Repair saved, but the internal note could not be saved. Try adding the note again.";
+                  save.disabled = false;
+                  return;
+                }
+              }
+            } else {
+              await window.AdminDataAdapter.createRepair(payload);
+            }
+          } else if (moduleKey === "services") {
+            const payload = {
+              name: values.name.trim(),
+              slug: values.slug.trim().toLowerCase(),
+              category: values.category.trim(),
+              description: values.description.trim(),
+              status: values.status,
+              sort_order: Number(values.sort_order) || 0,
+            };
+            if (record)
+              await window.AdminDataAdapter.updateService(record.id, payload);
+            else await window.AdminDataAdapter.createService(payload);
+          } else if (moduleKey === "posts") {
+            const payload = {
+              title: values.title.trim(),
+              caption: values.caption.trim(),
+              service_id: values.service_id || null,
+              status: values.status,
+              published_at:
+                values.status === "published"
+                  ? record?.status === "published"
+                    ? undefined
+                    : new Date().toISOString()
+                  : null,
+            };
+            if (record) {
+              if (payload.published_at === undefined)
+                delete payload.published_at;
+              await window.AdminDataAdapter.updatePost(record.id, payload);
+            } else {
+              payload.author_id = currentUserId;
+              if (!payload.published_at) delete payload.published_at;
+              await window.AdminDataAdapter.createPost(payload);
+            }
+          } else if (moduleKey === "comments") {
+            await window.AdminDataAdapter.moderateComment(
+              record.id,
+              values.status,
+              currentUserId,
+            );
+          }
+          dialog.close();
+          await loadModule(moduleKey, activePage);
+        } catch (error) {
+          console.error("Admin record save failed:", error);
+          status.textContent = error.message || "The record could not be saved.";
+          save.disabled = false;
+        }
+      });
+      dialog.showModal();
+    };
+
+    const saveSettingsForm = async (form) => {
+      const status = form.querySelector("[data-settings-status]");
+      const save = form.querySelector('[type="submit"]');
+      const values = new FormData(form);
+      save.disabled = true;
+      status.textContent = "Saving settings…";
+      try {
+        await window.AdminDataAdapter.saveSettings({
+          business_name: String(values.get("business_name") || "").trim(),
+          public_phone: String(values.get("public_phone") || "").trim() || null,
+          public_email: String(values.get("public_email") || "").trim() || null,
+          public_address:
+            String(values.get("public_address") || "").trim() || null,
+          business_hours:
+            String(values.get("business_hours") || "").trim() || null,
+          notification_preferences: {
+            email_repairs: values.has("email_repairs"),
+            email_comments: values.has("email_comments"),
+            email_activity: values.has("email_activity"),
+          },
+          updated_by: currentUserId,
+        });
+        status.textContent = "Settings saved.";
+      } catch (error) {
+        console.error("Business settings save failed:", error);
+        status.textContent = error.message || "Settings could not be saved.";
+        save.disabled = false;
       }
     };
 
@@ -943,12 +1409,30 @@
       }
     });
     host.addEventListener("input", () => {
-      if (activeModule !== "overview" && activeModule !== "settings")
-        renderFilteredTable(activeModule);
+      if (activeModule !== "overview" && activeModule !== "settings") {
+        getQueryState(activeModule).search =
+          host.querySelector("[data-module-search]")?.value || "";
+        window.clearTimeout(searchTimer);
+        searchTimer = window.setTimeout(
+          () => loadModule(activeModule, 0),
+          250,
+        );
+      }
     });
     host.addEventListener("change", () => {
-      if (activeModule !== "overview" && activeModule !== "settings")
-        renderFilteredTable(activeModule);
+      if (activeModule !== "overview" && activeModule !== "settings") {
+        const filters = getQueryState(activeModule).filters;
+        host.querySelectorAll("[data-module-filter]").forEach((select) => {
+          filters[select.dataset.moduleFilter] = select.value;
+        });
+        loadModule(activeModule, 0);
+      }
+    });
+    host.addEventListener("submit", (event) => {
+      const settingsForm = event.target.closest("[data-settings-form]");
+      if (!settingsForm) return;
+      event.preventDefault();
+      saveSettingsForm(settingsForm);
     });
     host.addEventListener("click", (event) => {
       const navigation = event.target.closest("[data-view-target]");
@@ -959,6 +1443,44 @@
       const retry = event.target.closest("[data-retry-module]");
       if (retry) {
         loadModule(retry.dataset.retryModule);
+        return;
+      }
+      const pageChange = event.target.closest("[data-page-change]");
+      if (pageChange) {
+        loadModule(activeModule, Number(pageChange.dataset.pageChange));
+        return;
+      }
+      const createRecord = event.target.closest("[data-create-record]");
+      if (createRecord) {
+        openEditor(createRecord.dataset.createRecord).catch((error) => {
+          console.error("Could not open record editor:", error);
+          window.alert(error.message || "The editor could not be opened.");
+        });
+        return;
+      }
+      const recordAction = event.target.closest("[data-record-action]");
+      if (recordAction?.dataset.recordAction === "mark-read") {
+        recordAction.disabled = true;
+        window.AdminDataAdapter.markNotificationRead(
+          recordAction.dataset.recordId,
+        )
+          .then(() => loadModule(activeModule, activePage))
+          .catch((error) => {
+            console.error("Notification update failed:", error);
+            window.alert(error.message || "Notification could not be updated.");
+            recordAction.disabled = false;
+          });
+        return;
+      }
+      if (recordAction?.dataset.recordAction === "edit") {
+        const record = activeRecords.find(
+          (item) => item.id === recordAction.dataset.recordId,
+        );
+        if (record)
+          openEditor(activeModule, record).catch((error) => {
+            console.error("Could not open record editor:", error);
+            window.alert(error.message || "The editor could not be opened.");
+          });
         return;
       }
       const detailAction = event.target.closest(
@@ -1024,6 +1546,23 @@
     const authModeStatus = document.querySelector("#auth-mode-status");
     const previewWarning = document.querySelector("#preview-warning");
     const skipLink = document.querySelector("#admin-skip-link");
+    const signoutButtons = document.querySelectorAll("#admin-signout");
+
+    signoutButtons.forEach((button) => {
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          const client = await window.AdminSupabaseClient.get();
+          const { error } = await client.auth.signOut();
+          if (error) throw error;
+          window.location.replace(new URL("./login/", window.location.href));
+        } catch (error) {
+          console.error("Owner sign-out failed:", error);
+          window.alert("Sign-out failed. Please try again.");
+          button.disabled = false;
+        }
+      });
+    });
 
     const showAccessMessage = (title, message) => {
       accessTitle.textContent = title;
@@ -1032,7 +1571,8 @@
       adminPage.dataset.adminState = "unauthorized";
     };
 
-    const showDashboard = (mode) => {
+    const showDashboard = (mode, userId = null) => {
+      currentUserId = userId;
       accessGate.hidden = true;
       adminLayout.hidden = false;
       adminPage.dataset.adminState = mode;
@@ -1043,6 +1583,9 @@
         mode === "preview" ? " Preview data only" : " Owner access verified",
       );
       previewWarning.hidden = mode !== "preview";
+      signoutButtons.forEach((button) => {
+        button.hidden = mode !== "authorized";
+      });
       skipLink.href = "#admin-main";
       loadModule("overview");
     };
@@ -1084,9 +1627,10 @@
           );
           return;
         }
-        showDashboard("authorized");
+        showDashboard("authorized", user.id);
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("Owner access verification failed:", error);
         showAccessMessage(
           "Unable to verify access",
           "Supabase access could not be verified. Check the connection and sign in again.",

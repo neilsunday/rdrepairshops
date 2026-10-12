@@ -970,6 +970,41 @@ ol {
   gap: 0.7rem;
   margin-top: 1.1rem;
 }
+.notebook-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+.notebook-tab {
+  min-height: 40px;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 999px;
+  background: var(--admin-surface);
+  color: var(--admin-muted);
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+.notebook-tab:hover {
+  border-color: var(--admin-text);
+  color: var(--admin-text);
+}
+.notebook-tab[aria-pressed="true"] {
+  border-color: var(--admin-text);
+  background: var(--admin-text);
+  color: var(--admin-surface);
+}
+.notebook-tab:focus-visible {
+  outline: 2px solid var(--admin-focus);
+  outline-offset: 2px;
+}
 .module-search {
   width: min(100%, 370px);
   min-height: 42px;

@@ -4,7 +4,7 @@ This document describes the live owner dashboard and the Supabase records it con
 
 ## Adapter Boundary
 
-The UI consumes collections by stable module key and normalizes them to records shaped below. Both adapters return `{ mode, records, total, page, pageSize }`; the production adapter additionally reads overview metrics and business settings. Supported owner operations are repair request create/update, append-only internal notes, service create/update, notification read state, and settings save. Repair showcase posts and comments remain part of the database contract for public-site compatibility, but are no longer managed from the admin dashboard. Customer directory and activity log entries are read-only. Do not put service-role credentials in browser code. Every query and mutation must be authorized by Supabase Auth and RLS; client-side visibility is not authorization.
+The UI consumes collections by stable module key and normalizes them to records shaped below. Both adapters return `{ mode, records, total, page, pageSize }`; the production adapter additionally reads overview metrics and business settings. Supported owner operations are repair request create/update, append-only internal notes, service create/update, client notebook entry create/update/delete, notification read state, and settings save. Repair showcase posts and comments remain part of the database contract for public-site compatibility, but are no longer managed from the admin dashboard. Customer directory and activity log entries are read-only. Do not put service-role credentials in browser code. Every query and mutation must be authorized by Supabase Auth and RLS; client-side visibility is not authorization.
 
 The dashboard deliberately has no direct customer deletion, role assignment, Storage upload, or anonymous public repair intake. Those require reviewed data-retention, authorization, and private Storage flows beyond this UI contract. Do not show a success state until the backend confirms the operation. UI states include loading, empty, error, filtered no-results, validation error, and operation success. Preview mode remains read-only.
 
@@ -28,6 +28,12 @@ The dashboard deliberately has no direct customer deletion, role assignment, Sto
 
 - `id`, `repair_request_id` references repair request, `from_status`, `to_status`, `customer_message`, `internal_note`, `changed_by`, `created_at`.
 - Customer-facing status history must never include internal notes. New status history records should be append-only and created with the trusted status update.
+
+### Client notebook entries
+
+- `client_notebook_entries`: owner-only private business log with `client_name`, optional phone/email, `entry_type` (`purchase`, `repair`, `other`), title, details, optional non-negative amount, entry date, creator, and timestamps.
+- Use purchase entries for retail items sold (for example, a phone case), repair entries for work ordered or performed, and other entries for general client notes. Keep repair completion evidence in `repair_internal_notes`; notebook entries are separate business records and are never shown in a customer's portal.
+- Migration `005_client_notebook.sql` grants table access only to authenticated users and applies owner-only RLS and a write guard. Preview mode returns no notebook records and stays read-only.
 
 ### Repair attachments
 

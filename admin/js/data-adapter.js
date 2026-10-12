@@ -22,6 +22,7 @@
     services: ["name", "category"],
     notifications: ["title", "detail"],
     activity: ["actor", "action", "target"],
+    notebook: ["clientName", "clientPhone", "clientEmail", "entryType", "title", "details"],
   };
 
   const normalizeText = (value) => String(value ?? "");
@@ -160,6 +161,25 @@
         createdAt: record.created_at,
       };
     }
+    if (collection === "notebook") {
+      return {
+        id: record.id,
+        clientName: record.client_name,
+        clientPhone: record.client_phone,
+        clientEmail: record.client_email,
+        entryType: record.entry_type,
+        title: record.title,
+        details: record.details || "",
+        detailsPreview:
+          record.details && record.details.length > 120
+            ? `${record.details.slice(0, 117)}…`
+            : record.details || "—",
+        amount: record.amount === null ? null : Number(record.amount),
+        entryDate: record.entry_date,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at,
+      };
+    }
     if (collection === "activity") {
       const target = record.entity_id
         ? `${record.entity_type}:${record.entity_id}`
@@ -186,6 +206,10 @@
     },
     async list(collection, options = {}) {
       await ensurePreviewData();
+      if (collection === "notebook") {
+        const { page = 0, pageSize = pageSizeDefault } = options;
+        return { mode: "preview", records: [], total: 0, page, pageSize };
+      }
       return previewList(collection, options);
     },
     async overview() {
@@ -220,6 +244,15 @@
       throw new Error("Preview mode is read-only.");
     },
     async addInternalNote() {
+      throw new Error("Preview mode is read-only.");
+    },
+    async createNotebookEntry() {
+      throw new Error("Preview mode is read-only.");
+    },
+    async updateNotebookEntry() {
+      throw new Error("Preview mode is read-only.");
+    },
+    async deleteNotebookEntry() {
       throw new Error("Preview mode is read-only.");
     },
     async createService() {
@@ -282,6 +315,26 @@
               "model",
               "reported_issue",
               "service_name_snapshot",
+            ]
+              .map((field) => `${field}.ilike.%${term}%`)
+              .join(","),
+          );
+      } else if (collection === "notebook") {
+        query = client
+          .from("client_notebook_entries")
+          .select("*", { count: "exact" })
+          .order("entry_date", { ascending: false })
+          .order("created_at", { ascending: false });
+        if (filters.entryType && filters.entryType !== "all")
+          query = query.eq("entry_type", filters.entryType);
+        if (term)
+          query = query.or(
+            [
+              "client_name",
+              "client_phone",
+              "client_email",
+              "title",
+              "details",
             ]
               .map((field) => `${field}.ilike.%${term}%`)
               .join(","),
@@ -632,6 +685,61 @@
         .single();
       if (error) throw databaseError("Settings could not be saved", error);
       return data;
+    },
+    async createNotebookEntry(payload) {
+      const allowed = [
+        "client_name",
+        "client_phone",
+        "client_email",
+        "entry_type",
+        "title",
+        "details",
+        "amount",
+        "entry_date",
+      ];
+      const safePayload = Object.fromEntries(
+        Object.entries(payload).filter(([key]) => allowed.includes(key)),
+      );
+      const client = await window.AdminSupabaseClient.get();
+      const { data, error } = await client
+        .from("client_notebook_entries")
+        .insert(safePayload)
+        .select("id")
+        .single();
+      if (error) throw databaseError("Notebook entry could not be created", error);
+      return data;
+    },
+    async updateNotebookEntry(id, payload) {
+      const allowed = [
+        "client_name",
+        "client_phone",
+        "client_email",
+        "entry_type",
+        "title",
+        "details",
+        "amount",
+        "entry_date",
+      ];
+      const safePayload = Object.fromEntries(
+        Object.entries(payload).filter(([key]) => allowed.includes(key)),
+      );
+      const client = await window.AdminSupabaseClient.get();
+      const { data, error } = await client
+        .from("client_notebook_entries")
+        .update(safePayload)
+        .eq("id", id)
+        .select("id,updated_at")
+        .single();
+      if (error) throw databaseError("Notebook entry could not be updated", error);
+      return data;
+    },
+    async deleteNotebookEntry(id) {
+      const client = await window.AdminSupabaseClient.get();
+      const { error } = await client
+        .from("client_notebook_entries")
+        .delete()
+        .eq("id", id);
+      if (error) throw databaseError("Notebook entry could not be deleted", error);
     },
   };
 

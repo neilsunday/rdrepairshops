@@ -91,6 +91,23 @@
       action: "details",
       actionLabel: "View notes",
     },
+    notebook: {
+      title: "Client Notebook",
+      description:
+        "Keep a private record of client purchases, requested repairs and services, and other shop notes.",
+      collection: "notebook",
+      search: ["clientName", "clientPhone", "clientEmail", "title", "details"],
+      columns: [
+        ["entryDate", "Date"],
+        ["clientName", "Client"],
+        ["entryType", "Type"],
+        ["title", "Item or service"],
+        ["detailsPreview", "Notes"],
+        ["amount", "Amount (PHP)"],
+      ],
+      action: "notebook",
+      cta: "New notebook entry",
+    },
     customers: {
       title: "Customers",
       description:
@@ -359,7 +376,12 @@
       if (!moduleQueryState.has(moduleKey))
         moduleQueryState.set(moduleKey, {
           search: "",
-          filters: moduleKey === "notes" ? { status: "completed" } : {},
+          filters:
+            moduleKey === "notes"
+              ? { status: "completed" }
+              : moduleKey === "notebook"
+                ? { entryType: "all" }
+                : {},
         });
       return moduleQueryState.get(moduleKey);
     };
@@ -388,6 +410,18 @@
     const formatValue = (key, value) => {
       if (value === null || value === undefined || value === "")
         return "Not assigned";
+      if (key === "entryType") {
+        return {
+          purchase: "Purchase",
+          repair: "Repair / service",
+          other: "Other note",
+        }[value] || String(value);
+      }
+      if (key === "entryDate" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return new Intl.DateTimeFormat(undefined, {
+          dateStyle: "medium",
+        }).format(new Date(`${value}T12:00:00`));
+      }
       if (
         key.toLowerCase().endsWith("at") &&
         !Number.isNaN(Date.parse(value))
@@ -460,6 +494,11 @@
               ? `${record.brand} ${record.model}`
               : key === "workNoteCount"
                 ? String(record.workNotes?.length || 0)
+                : key === "amount" && record.amount !== null
+                  ? new Intl.NumberFormat("en-PH", {
+                      style: "currency",
+                      currency: "PHP",
+                    }).format(record.amount)
               : record[key];
           const cell = makeElement(
             "td",
@@ -521,7 +560,24 @@
             action.dataset.recordId = record.id;
             actionCell.append(action);
           }
-          if (definition.cta && isProduction()) {
+          if (definition.action === "notebook") {
+            const edit = makeElement("button", "table-action", "Edit");
+            edit.type = "button";
+            edit.dataset.notebookAction = "edit";
+            edit.dataset.recordId = record.id;
+            edit.setAttribute("aria-label", `Edit notebook entry for ${record.clientName}`);
+            const remove = makeElement("button", "table-action", "Delete");
+            remove.type = "button";
+            remove.dataset.notebookAction = "delete";
+            remove.dataset.recordId = record.id;
+            remove.setAttribute("aria-label", `Delete notebook entry for ${record.clientName}`);
+            actionCell.append(edit, remove);
+          }
+          if (
+            definition.cta &&
+            definition.action !== "notebook" &&
+            isProduction()
+          ) {
             const action = makeElement("button", "table-action", "Edit");
             action.type = "button";
             action.dataset.recordAction = "edit";
@@ -773,6 +829,27 @@
         controls.append(label);
       });
       if (controls.childElementCount) panel.append(controls);
+      if (activeModule === "notebook") {
+        const tabs = makeElement("div", "notebook-tabs");
+        tabs.setAttribute("role", "group");
+        tabs.setAttribute("aria-label", "Filter notebook entries");
+        [
+          ["all", "All entries"],
+          ["purchase", "Purchases"],
+          ["repair", "Repairs & services"],
+          ["other", "Other notes"],
+        ].forEach(([value, label]) => {
+          const tab = makeElement("button", "notebook-tab", label);
+          tab.type = "button";
+          tab.dataset.notebookTab = value;
+          tab.setAttribute(
+            "aria-pressed",
+            String(getQueryState(activeModule).filters.entryType === value),
+          );
+          tabs.append(tab);
+        });
+        panel.append(tabs);
+      }
       const count = makeElement("p", "table-count", "");
       count.id = "module-record-count";
       count.setAttribute("role", "status");
@@ -793,7 +870,9 @@
       const empty = makeElement(
         "p",
         "module-state",
-        `No ${definition.title.toLowerCase()} records are available.`,
+        activeModule === "notebook"
+          ? "Your notebook is empty. Add a purchase, repair or service, or general client note."
+          : `No ${definition.title.toLowerCase()} records are available.`,
       );
       empty.dataset.moduleState = "empty";
       empty.hidden = true;
@@ -813,7 +892,9 @@
         "p",
         "module-action-note",
         isProduction()
-          ? "Customer records are read-only. Repair, service, notification, and settings actions are saved to Supabase."
+          ? activeModule === "notebook"
+            ? "Notebook entries are private to the owner. Purchases, repairs, services, and general client notes are saved to Supabase."
+            : "Customer records are read-only. Repair, service, notification, and settings actions are saved to Supabase."
           : "Data changes and destructive actions are disabled in this preview.",
       );
       actionNote.id = "module-action-note";
@@ -1348,6 +1429,7 @@
       const entityName = {
         repairs: "repair request",
         services: "service",
+        notebook: "notebook entry",
       }[moduleKey];
       const title = makeElement(
         "h2",
@@ -1473,6 +1555,76 @@
           type: "number",
           value: record?.sortOrder ?? 0,
         });
+      } else if (moduleKey === "notebook") {
+        const clientNameInput = addEditorField(fields, {
+          key: "client_name",
+          label: "Client name",
+          value: record?.clientName || "",
+          required: true,
+        });
+        clientNameInput.maxLength = 160;
+        const clientPhoneInput = addEditorField(fields, {
+          key: "client_phone",
+          label: "Client phone (optional)",
+          type: "tel",
+          value: record?.clientPhone || "",
+        });
+        clientPhoneInput.maxLength = 80;
+        const clientEmailInput = addEditorField(fields, {
+          key: "client_email",
+          label: "Client email (optional)",
+          type: "email",
+          value: record?.clientEmail || "",
+        });
+        clientEmailInput.maxLength = 320;
+        addEditorSelect(fields, {
+          key: "entry_type",
+          label: "Notebook tab",
+          options: [
+            ["purchase", "Purchase / item sold"],
+            ["repair", "Repair / service"],
+            ["other", "Other client note"],
+          ],
+          value:
+            record?.entryType ||
+            (getQueryState("notebook").filters.entryType === "all"
+              ? "purchase"
+              : getQueryState("notebook").filters.entryType),
+        });
+        const titleInput = addEditorField(fields, {
+          key: "title",
+          label: "Item or service",
+          value: record?.title || "",
+          required: true,
+        });
+        titleInput.maxLength = 200;
+        const detailsInput = addEditorField(fields, {
+          key: "details",
+          label: "Notes",
+          value: record?.details || "",
+          rows: 5,
+        });
+        detailsInput.maxLength = 8000;
+        const amountInput = addEditorField(fields, {
+          key: "amount",
+          label: "Amount paid (PHP, optional)",
+          type: "number",
+          value: record?.amount ?? "",
+        });
+        amountInput.min = "0";
+        amountInput.max = "99999999.99";
+        amountInput.step = "0.01";
+        const localToday = new Date();
+        localToday.setMinutes(
+          localToday.getMinutes() - localToday.getTimezoneOffset(),
+        );
+        addEditorField(fields, {
+          key: "entry_date",
+          label: "Date",
+          type: "date",
+          value: record?.entryDate || localToday.toISOString().slice(0, 10),
+          required: true,
+        });
       }
 
       const actions = makeElement("div", "record-editor__actions");
@@ -1554,8 +1706,32 @@
             if (record)
               await window.AdminDataAdapter.updateService(record.id, payload);
             else await window.AdminDataAdapter.createService(payload);
+          } else if (moduleKey === "notebook") {
+            const amount = values.amount.trim();
+            const payload = {
+              client_name: values.client_name.trim(),
+              client_phone: values.client_phone.trim() || null,
+              client_email: values.client_email.trim() || null,
+              entry_type: values.entry_type,
+              title: values.title.trim(),
+              details: values.details.trim() || null,
+              amount: amount ? Number(amount) : null,
+              entry_date: values.entry_date,
+            };
+            if (amount && (!Number.isFinite(payload.amount) || payload.amount < 0)) {
+              status.textContent = "Enter a valid amount of 0 or more.";
+              save.disabled = false;
+              return;
+            }
+            if (record)
+              await window.AdminDataAdapter.updateNotebookEntry(record.id, payload);
+            else await window.AdminDataAdapter.createNotebookEntry(payload);
           }
           dialog.close();
+          if (moduleKey === "notebook")
+            showToast(
+              record ? "Notebook entry updated." : "Notebook entry added.",
+            );
           await loadModule(moduleKey, activePage);
         } catch (error) {
           console.error("Admin record save failed:", error);
@@ -1682,6 +1858,55 @@
       const pageChange = event.target.closest("[data-page-change]");
       if (pageChange) {
         loadModule(activeModule, Number(pageChange.dataset.pageChange));
+        return;
+      }
+      const notebookTab = event.target.closest("[data-notebook-tab]");
+      if (notebookTab && activeModule === "notebook") {
+        getQueryState("notebook").filters.entryType =
+          notebookTab.dataset.notebookTab;
+        host.querySelectorAll("[data-notebook-tab]").forEach((tab) => {
+          tab.setAttribute(
+            "aria-pressed",
+            String(tab === notebookTab),
+          );
+        });
+        loadModule("notebook", 0);
+        return;
+      }
+      const notebookAction = event.target.closest("[data-notebook-action]");
+      if (notebookAction && activeModule === "notebook") {
+        const record = activeRecords.find(
+          (item) => item.id === notebookAction.dataset.recordId,
+        );
+        if (!record) return;
+        if (notebookAction.dataset.notebookAction === "edit") {
+          openEditor("notebook", record).catch((error) => {
+            console.error("Could not open notebook entry:", error);
+            showToast(error.message || "The notebook entry could not be opened.", "error");
+          });
+        } else if (
+          notebookAction.dataset.notebookAction === "delete" &&
+          window.confirm(
+            `Delete the notebook entry for ${record.clientName} (${record.title})? This cannot be undone.`,
+          )
+        ) {
+          notebookAction.disabled = true;
+          notebookAction.textContent = "Deleting…";
+          window.AdminDataAdapter.deleteNotebookEntry(record.id)
+            .then(() => {
+              showToast("Notebook entry deleted.");
+              return loadModule("notebook", activePage);
+            })
+            .catch((error) => {
+              console.error("Notebook entry delete failed:", error);
+              showToast(
+                error.message || "The notebook entry could not be deleted.",
+                "error",
+              );
+              notebookAction.disabled = false;
+              notebookAction.textContent = "Delete";
+            });
+        }
         return;
       }
       const createRecord = event.target.closest("[data-create-record]");

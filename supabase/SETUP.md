@@ -6,7 +6,7 @@ The repository contains Supabase migrations and an owner dashboard configured to
 
 The default dashboard uses Supabase Auth and the authenticated browser client. Owner authorization and row access must continue to be enforced by RLS; a service-role key must never be placed in browser code. The `?preview=1` dashboard is still isolated, synthetic, and read-only.
 
-The dashboard supports owner reads and writes for repair requests, services, notification read state, work notes, and business settings. Customer-directory and activity entries are read-only. The customer portal supports authenticated repair intake and private repair photos after migrations `001` through `003` are applied. Migration `004` exposes only approved public business contact fields to the public website. Anonymous repair intake and showcase media upload are not supported.
+The dashboard supports owner reads and writes for repair requests, services, notebook entries, notification read state, work notes, and business settings. Customer-directory and activity entries are read-only. The customer portal supports authenticated repair intake and private repair photos after migrations `001` through `003` are applied. Migration `004` exposes only approved public business contact fields to the public website. Migration `005` creates the private owner notebook. Anonymous repair intake and showcase media upload are not supported.
 
 ## Migration Order
 
@@ -17,7 +17,8 @@ The dashboard supports owner reads and writes for repair requests, services, not
 5. Apply `migrations/002_owner_customer_directory.sql` and confirm its owner view along with the baseline tables, RLS, policies, and helper functions using the verification checklist below.
 6. Apply `migrations/003_customer_repair_booking.sql` after confirming `001` and `002` are installed. It configures the private repair-photo bucket and scoped customer/owner policies; database table RLS alone does not authorize Storage objects.
 7. Apply `migrations/004_public_business_profile.sql` after confirming `001` is installed. It creates only the allowlisted public profile view; it does not write to owner-protected settings.
-8. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
+8. Apply `migrations/005_client_notebook.sql` after `001` to add the owner-only client notebook. It does not insert sample entries.
+9. Provision the owner only after Auth user creation using the actual Auth UUID and the trusted SQL-editor procedure below.
 
 ## Exact ordered manual checklist
 
@@ -34,6 +35,7 @@ The dashboard supports owner reads and writes for repair requests, services, not
    - Only after that is confirmed, run `supabase/migrations/002_owner_customer_directory.sql`. The owner dashboard's Customers section depends on `public.owner_customer_directory`.
    - Only after `001` and `002` are confirmed, run `supabase/migrations/003_customer_repair_booking.sql`. It configures private `repair-attachments` Storage access and enforces the customer photo limits.
    - Run `supabase/migrations/004_public_business_profile.sql` after `001`. This enables public profile synchronization without granting access to or writing to the owner-only settings table.
+   - Run `supabase/migrations/005_client_notebook.sql` after `001`. This creates owner-only storage for client purchases, repairs, services, and general notes.
    - Do not run the SQL in a different order or with destructive resets.
 
 4. Create or invite the owner Auth account.
@@ -201,6 +203,7 @@ Policies are permissive within a command, so owner and self-row policies OR toge
 | `comments` / views               | Base table SELECT denied to anon; `public_approved_comments` exposes approved published comments without profile/moderation IDs | Read safe public comments and own limited columns; submit pending on published posts; edit own pending body only; moderation-state changes and cross-user access denied            | Read full rows through `owner_comments`; insert/update including moderation through owner policy/grants; direct deletes are not granted, use moderation states. |
 | `notifications`                  | No access                                                                                                                       | Select own recipient notifications and update own `read_at` only; cross-recipient access and content edits denied                                                                  | Select/insert/update. Delete is not granted.                                                                                                                    |
 | `business_settings`              | No access                                                                                                                       | No access                                                                                                                                                                          | Select/insert/update the singleton settings record. Delete is not granted.                                                                                      |
+| `client_notebook_entries`        | No access                                                                                                                       | No access                                                                                                                                                                          | Select/insert/update/delete private notebook entries for client purchases, repairs, services, and other notes.                                                   |
 | `admin_activity_logs`            | No access                                                                                                                       | No access; direct insert/update/delete denied                                                                                                                                      | Select only; logs are trigger/backend-written and direct client mutations are denied.                                                                           |
 | `app_private.is_owner()`         | Execute denied                                                                                                                  | Authenticated may execute the boolean helper; it reveals only whether their own Auth UUID has the trusted owner row                                                                | Same helper. The schema is not to be exposed through PostgREST.                                                                                                 |
 
@@ -250,6 +253,7 @@ Perform these tests in a non-production project with two distinct customer Auth 
 - [ ] Verify the owner retains reaction select/delete access after a post is unpublished, while customers do not.
 - [ ] Verify only the owner can read/update `business_settings`, and the authenticated client cannot delete the singleton row.
 - [ ] Verify anonymous and authenticated users can read only the approved columns in `public_business_profile`, and cannot read `business_settings`.
+- [ ] Verify only the owner can read or modify `client_notebook_entries`; anonymous and customer accounts must have no access.
 - [ ] Confirm an account with an `admin` enum role but no `owner` role does not get owner access.
 - [ ] Confirm customer uploads are private, per-request photo limits are enforced, and owner signed URLs work.
 

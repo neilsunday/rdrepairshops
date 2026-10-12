@@ -58,88 +58,174 @@
     </header>
 
     <main class="client-main" id="client-main">
-      <section class="client-intro" aria-labelledby="client-title">
-        <p class="eyebrow"><span class="eyebrow__line"></span> CUSTOMER PORTAL</p>
-        <h1 id="client-title">Repairs, <span>in one place.</span></h1>
-        <p>
-          Book a repair, share photos of the issue, and follow customer-visible
-          updates from our team.
-        </p>
-      </section>
+      <div class="client-login-layout" id="client-login-layout">
+        <section class="client-login-main" aria-labelledby="client-title">
+          <a class="client-login-brand" href="../" aria-label="R&D Cellphone Repair home">
+            <span class="client-login-brand__mark">R&amp;D</span>
+            <span class="client-login-brand__name">CELLPHONE REPAIR</span>
+          </a>
+          <p class="client-login-eyebrow">
+            <span class="eyebrow__line"></span> CUSTOMER PORTAL / SECURE ACCESS
+          </p>
+          <h1 class="client-login-heading" id="client-title">
+            Your repairs,<br /><span>in good hands.</span>
+          </h1>
+          <p class="client-login-intro">
+            Sign in to book a repair, share device photos, and follow updates
+            from our team.
+          </p>
 
-      <div class="client-notice" id="client-notice" role="status" aria-live="polite" hidden></div>
-      <div class="client-error" id="client-error" role="alert" hidden></div>
+          <div
+            class="client-notice"
+            id="client-notice"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></div>
+          <div
+            class="client-error"
+            id="client-error"
+            role="alert"
+            aria-live="assertive"
+            hidden
+          ></div>
 
-      <section class="client-card auth-card" id="auth-panel" aria-labelledby="auth-title">
-        <div class="card-heading">
-          <div>
-            <p class="eyebrow">YOUR ACCOUNT</p>
-            <h2 id="auth-title">Sign in to continue</h2>
+          <section class="auth-card" id="auth-panel" aria-labelledby="auth-title">
+            <div class="auth-card__heading">
+              <p class="eyebrow">YOUR ACCOUNT</p>
+              <h2 id="auth-title">Sign in to continue</h2>
+              <p class="auth-card__copy">
+                Your repair requests and updates are private to your account.
+              </p>
+            </div>
+            <form id="auth-form" class="client-form auth-form">
+              <label>
+                Email address
+                <input
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  inputmode="email"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  placeholder="you@gmail.com"
+                  aria-describedby="auth-email-help"
+                  required
+                  maxlength="254"
+                />
+                <small class="field-help" id="auth-email-help">
+                  Use an email address you can access to verify your account.
+                </small>
+              </label>
+              <label>
+                Password
+                <input
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                  minlength="8"
+                />
+              </label>
+              <div id="signup-fields" class="signup-fields" hidden>
+                <label>
+                  Full name
+                  <input
+                    name="display_name"
+                    type="text"
+                    autocomplete="name"
+                    maxlength="160"
+                  />
+                </label>
+                <label>
+                  Phone number
+                  <input
+                    name="phone"
+                    type="tel"
+                    autocomplete="tel"
+                    inputmode="tel"
+                    placeholder="09XX XXX XXXX or +639XX XXX XXXX"
+                    aria-describedby="signup-phone-help"
+                    maxlength="24"
+                  />
+                  <small class="field-help" id="signup-phone-help">
+                    Philippine mobile number; enter 09XXXXXXXXX or +639XXXXXXXXX.
+                  </small>
+                </label>
+              </div>
+              <p class="form-message" id="auth-message" aria-live="polite"></p>
+              <div class="auth-form__actions">
+                <button class="button auth-submit" id="auth-submit" type="submit">
+                  Sign in
+                  <span aria-hidden="true">→</span>
+                </button>
+                <button
+                  class="auth-toggle"
+                  id="auth-toggle"
+                  type="button"
+                  aria-controls="signup-fields"
+                  aria-expanded="false"
+                >
+                  Create account
+                </button>
+              </div>
+            </form>
+          </section>
+          <p class="client-login-back">
+            <a class="text-link" href="../">← Back to the R&amp;D website</a>
+          </p>
+        </section>
+
+        <aside class="client-login-aside" aria-label="Customer portal information">
+          <div class="client-login-aside__top">
+            <span>R&amp;D / CUSTOMER CARE</span>
+            <span>PRIVATE PORTAL</span>
           </div>
-          <span class="card-index">01</span>
-        </div>
-        <p class="card-copy">
-          An account keeps your repair requests and updates private to you.
-        </p>
-        <form id="auth-form" class="client-form">
-          <label>
-            Email address
-            <input
-              name="email"
-              type="email"
-              autocomplete="email"
-              inputmode="email"
-              autocapitalize="none"
-              spellcheck="false"
-              placeholder="you@gmail.com"
-              aria-describedby="auth-email-help"
-              required
-              maxlength="254"
-            />
-            <small class="field-help" id="auth-email-help">
-              Use an email address you can access to verify your account.
-            </small>
-          </label>
-          <label>
-            Password
-            <input name="password" type="password" autocomplete="current-password" required minlength="8" />
-          </label>
-          <div id="signup-fields" class="signup-fields" hidden>
-            <label>
-              Full name
-              <input name="display_name" type="text" autocomplete="name" maxlength="160" />
-            </label>
-            <label>
-              Phone number
-              <input
-                name="phone"
-                type="tel"
-                autocomplete="tel"
-                inputmode="tel"
-                placeholder="09XX XXX XXXX or +639XX XXX XXXX"
-                aria-describedby="signup-phone-help"
-                maxlength="24"
-              />
-              <small class="field-help" id="signup-phone-help">
-                Philippine mobile number; enter 09XXXXXXXXX or +639XXXXXXXXX.
-              </small>
-            </label>
-          </div>
-          <p class="form-message" id="auth-message" aria-live="polite"></p>
-          <div class="form-actions">
-            <button class="button" id="auth-submit" type="submit">Sign in</button>
-            <button
-              class="button button--quiet"
-              id="auth-toggle"
-              type="button"
-              aria-controls="signup-fields"
-              aria-expanded="false"
+          <div class="client-login-illustration">
+            <svg
+              viewBox="0 0 420 360"
+              role="img"
+              aria-labelledby="client-login-art-title client-login-art-desc"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              Create account
-            </button>
+              <title id="client-login-art-title">Phone service workspace</title>
+              <desc id="client-login-art-desc">
+                A clean line illustration of a phone and repair tools.
+              </desc>
+              <g
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="square"
+                stroke-linejoin="miter"
+              >
+                <path d="M46 180h74m180 0h74M210 34v49m0 194v49M65 65h35m-35 0v35m290-35h-35m35 0v35M65 295h35m-35 0v-35m290 35h-35m35 0v-35" />
+                <rect x="145" y="43" width="130" height="274" rx="15" />
+                <rect x="156" y="67" width="108" height="220" rx="3" />
+                <path d="M184 56h52m-27 247h2M172 92h76m-76 11h45m-45 128h76m-76 11h48" />
+                <path d="m99 123 25-25 14 14-25 25-14-14Zm25-25 8-8 14 14-8 8m-48 47 13 13" />
+                <circle cx="127" cy="226" r="3" />
+                <circle cx="294" cy="111" r="3" />
+                <circle cx="310" cy="231" r="3" />
+              </g>
+            </svg>
           </div>
-        </form>
-      </section>
+          <div class="client-login-aside__copy">
+            <p class="client-login-aside__eyebrow">
+              <span class="eyebrow__line"></span> REPAIR CARE, MADE SIMPLE
+            </p>
+            <h2>Everything about your repair, all in one place.</h2>
+            <p>
+              Book a service, share details about your device, and check
+              customer-visible updates whenever you need them.
+            </p>
+          </div>
+          <p class="client-login-aside__foot">
+            <span aria-hidden="true">●</span>
+            PRIVATE CUSTOMER ACCOUNT
+          </p>
+        </aside>
+      </div>
 
       <section class="client-workspace" id="workspace" hidden>
         <div class="customer-dashboard-layout">

@@ -1683,3 +1683,204 @@ ol {
     animation-iteration-count: 1 !important;
   }
 }
+
+.overview-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.overview-hero .module-page-heading {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.overview-refresh {
+  flex: 0 0 auto;
+}
+.overview-metrics-heading {
+  margin: 1.8rem 0 0.65rem;
+  color: var(--admin-subtle);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.metric-grid {
+  gap: 0.85rem;
+  border: 0;
+  background: transparent;
+}
+.metric-item--action {
+  appearance: none;
+  width: 100%;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--admin-border);
+  border-top: 3px solid var(--metric-accent, var(--admin-border-strong));
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+.metric-item--action:hover {
+  border-color: var(--metric-accent, var(--admin-border-strong));
+  box-shadow: 0 5px 18px rgb(0 0 0 / 7%);
+  transform: translateY(-2px);
+}
+.metric-item--action:focus-visible {
+  outline: 2px solid var(--admin-focus);
+  outline-offset: 3px;
+}
+.metric-item--open {
+  --metric-accent: #515b68;
+}
+.metric-item--waiting {
+  --metric-accent: #9a6700;
+}
+.metric-item--progress {
+  --metric-accent: #3974a5;
+}
+.metric-item--ready {
+  --metric-accent: #35724f;
+}
+html[data-theme="dark"] .metric-item--open {
+  --metric-accent: #aeb9c6;
+}
+html[data-theme="dark"] .metric-item--waiting {
+  --metric-accent: #e2b655;
+}
+html[data-theme="dark"] .metric-item--progress {
+  --metric-accent: #79b6e6;
+}
+html[data-theme="dark"] .metric-item--ready {
+  --metric-accent: #82c69a;
+}
+.metric-item--action .metric-item__label {
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+}
+.metric-item--action .metric-item__value {
+  margin-top: 0.65rem;
+  font-size: 2rem;
+  font-weight: 600;
+}
+.metric-item--action .metric-item__note {
+  margin-top: 0.5rem;
+  color: var(--admin-subtle);
+  font-size: 0.68rem;
+}
+.metric-item__action {
+  margin-top: auto;
+  padding-top: 0.85rem;
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.overview-shortcuts {
+  margin-top: 1.8rem;
+}
+.overview-section-heading {
+  margin-bottom: 0.75rem;
+}
+.overview-section-heading h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.overview-section-heading p {
+  margin-top: 0.25rem;
+  color: var(--admin-muted);
+  font-size: 0.74rem;
+}
+.overview-shortcuts__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.overview-shortcut {
+  min-width: 0;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+.overview-shortcut:hover {
+  border-color: var(--admin-border-strong);
+  background: var(--admin-surface-alt);
+}
+.overview-shortcut__title {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.overview-shortcut__description {
+  margin-top: 0.4rem;
+  color: var(--admin-muted);
+  font-size: 0.69rem;
+  line-height: 1.45;
+}
+.overview-shortcut__arrow {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  color: var(--admin-subtle);
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+.activity-empty {
+  display: block !important;
+  padding: 0.8rem 0;
+  color: var(--admin-muted);
+  font-size: 0.73rem;
+}
+
+@media (max-width: 1120px) {
+  .metric-grid,
+  .overview-shortcuts__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .overview-hero {
+    align-items: flex-start;
+  }
+  .overview-hero .module-page-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .overview-hero .module-page-heading .data-label {
+    margin-top: 0;
+  }
+  .overview-refresh {
+    min-height: 38px;
+  }
+  .overview-shortcuts__grid {
+    gap: 0.55rem;
+  }
+  .overview-shortcut {
+    min-height: 142px;
+    padding: 0.8rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .metric-grid,
+  .overview-shortcuts__grid {
+    grid-template-columns: 1fr;
+  }
+}

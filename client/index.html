@@ -142,182 +142,277 @@
       </section>
 
       <section class="client-workspace" id="workspace" hidden>
-        <section class="dashboard-welcome" aria-labelledby="dashboard-heading">
-          <div>
-            <p class="eyebrow">CUSTOMER DASHBOARD</p>
-            <h2 id="dashboard-heading">Welcome back, <span id="customer-label"></span></h2>
-            <p class="dashboard-greeting">Here’s a quick look at your repairs.</p>
-          </div>
-          <a class="button dashboard-book-action" href="#booking-title">Book a Repair</a>
-        </section>
-
-        <section class="overview-grid" aria-label="Your repair overview">
-          <article class="overview-card">
-            <span class="overview-label">Total requests</span>
-            <strong id="stat-total" class="overview-value">—</strong>
-          </article>
-          <article class="overview-card">
-            <span class="overview-label">Pending</span>
-            <strong id="stat-pending" class="overview-value">—</strong>
-          </article>
-          <article class="overview-card">
-            <span class="overview-label">In progress</span>
-            <strong id="stat-progress" class="overview-value">—</strong>
-          </article>
-          <article class="overview-card">
-            <span class="overview-label">Completed</span>
-            <strong id="stat-completed" class="overview-value">—</strong>
-          </article>
-        </section>
-
-        <div class="workspace-bar">
-          <p class="workspace-email">
-            <span class="eyebrow">SIGNED IN AS</span>
-            <strong id="workspace-customer-label"></strong>
-          </p>
-          <button class="button button--quiet button--small" id="sign-out" type="button">
-            Sign out
-          </button>
-        </div>
-
-        <details class="client-card profile-card">
-          <summary class="profile-summary">
-            <span>
-              <span class="eyebrow">ACCOUNT DETAILS</span>
-              <strong id="profile-title">Your contact details</strong>
-            </span>
-            <span class="profile-summary-action">Edit profile</span>
-          </summary>
-          <form id="profile-form" class="client-form profile-form">
-            <label>
-              Full name <span class="required-indicator">Required</span>
-              <input name="display_name" type="text" autocomplete="name" required maxlength="160" />
-            </label>
-            <label>
-              Phone number <span class="label-optional">Optional</span>
-              <input
-                name="phone"
-                type="tel"
-                autocomplete="tel"
-                inputmode="tel"
-                placeholder="09XX XXX XXXX or +639XX XXX XXXX"
-                aria-describedby="profile-phone-help"
-                maxlength="24"
-              />
-              <small class="field-help" id="profile-phone-help">
-                Philippine mobile number; enter 09XXXXXXXXX or +639XXXXXXXXX.
-              </small>
-            </label>
-            <p id="profile-email" class="profile-email form-span"></p>
-            <button class="button button--quiet" type="submit">Save contact details</button>
-          </form>
-        </details>
-
-        <section class="client-card booking-card" aria-labelledby="booking-title">
-          <div class="card-heading">
-            <div>
-              <p class="eyebrow">NEW REQUEST</p>
-              <h2 id="booking-title">Book a repair</h2>
+        <div class="customer-dashboard-layout">
+          <aside class="customer-sidebar" aria-label="Customer dashboard navigation">
+            <div class="customer-sidebar__brand">
+              <span class="customer-sidebar__mark">R&amp;D</span>
+              <span>MY REPAIR<br />DASHBOARD</span>
             </div>
-            <span class="card-index">02</span>
-          </div>
-          <p class="card-copy">
-            Tell us about your device. A photo is optional and can help our team
-            understand the issue.
-          </p>
-          <form id="booking-form" class="client-form booking-form">
-            <fieldset class="booking-group">
-              <legend>Device details</legend>
-              <div class="form-grid">
-                <label>
-                  Device type <span class="required-indicator">Required</span>
-                  <select name="device_type" required>
-                    <option value="">Choose device type</option>
-                    <option>Smartphone</option>
-                    <option>Tablet</option>
-                    <option>Smartwatch</option>
-                    <option>Other device</option>
-                  </select>
-                </label>
-                <label>
-                  Brand <span class="required-indicator">Required</span>
-                  <input name="brand" type="text" required maxlength="100" placeholder="e.g. Apple, Samsung, Google" />
-                </label>
-                <label class="form-span">
-                  Model <span class="required-indicator">Required</span>
-                  <input name="model" type="text" required maxlength="160" placeholder="e.g. iPhone 14, Galaxy S23" />
-                </label>
-              </div>
-            </fieldset>
-            <fieldset class="booking-group">
-              <legend>Repair details</legend>
-              <div class="form-grid">
-                <label class="form-span">
-                  Repair service <span class="label-optional">Optional</span>
-                  <span class="service-picker">
-                    <input
-                      id="service-search"
-                      type="search"
-                      autocomplete="off"
-                      placeholder="Search services by name or category"
-                      role="combobox"
-                      aria-autocomplete="list"
-                      aria-expanded="false"
-                      aria-controls="service-options"
-                    />
-                    <button id="service-clear" class="service-clear" type="button" aria-label="Clear selected repair service" hidden>×</button>
-                    <select name="service_id" id="service-select" class="visually-hidden" tabindex="-1" aria-hidden="true">
-                      <option value="">Other / not listed</option>
-                    </select>
-                    <span id="service-options" class="service-options" role="listbox" aria-label="Matching repair services" hidden></span>
-                  </span>
-                  <span id="service-selection-status" class="field-help" aria-live="polite">No service selected. You can also describe the issue below.</span>
-                </label>
-                <label class="form-span">
-                  Describe the issue <span class="required-indicator">Required</span>
-                  <textarea name="reported_issue" rows="5" required maxlength="5000" placeholder="What happened, when did it start, and what have you noticed?"></textarea>
-                </label>
-              </div>
-            </fieldset>
-            <fieldset class="booking-group">
-              <legend>Photos</legend>
-              <label class="photo-dropzone" for="repair-photos">
-                <span class="photo-dropzone-icon" aria-hidden="true">＋</span>
-                <span><strong>Add photos of the issue</strong><small>Optional · up to 5 images · 5 MB each</small></span>
-                <input
-                  id="repair-photos"
-                  name="photos"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/heic"
-                  multiple
-                />
-              </label>
-              <p class="photo-help">JPEG, PNG, WebP, or HEIC. Avoid including passwords or other sensitive personal information.</p>
-              <div class="photo-preview-list" id="photo-preview-list" aria-live="polite"></div>
-            </fieldset>
-            <p class="form-message" id="booking-message" aria-live="polite"></p>
-            <button class="button booking-submit" id="booking-submit" type="submit">
-              <span class="button-label">Submit repair request</span>
-              <span class="button-loading" aria-hidden="true">Submitting…</span>
-            </button>
-          </form>
-        </section>
-
-        <section class="client-card repairs-card" aria-labelledby="repairs-title">
-          <div class="card-heading">
-            <div>
-              <p class="eyebrow">YOUR HISTORY</p>
-              <h2 id="repairs-title">Repair requests</h2>
-            </div>
-            <div class="history-actions">
-              <span id="repair-count-label" class="repair-count-label"></span>
-              <button class="button button--quiet button--small" id="refresh-repairs" type="button">
-                Refresh
+            <p class="customer-sidebar__caption">YOUR ACCOUNT</p>
+            <nav class="customer-nav" aria-label="Dashboard sections">
+              <a class="customer-nav__link is-active" href="#dashboard-overview" data-customer-nav>
+                <span class="customer-nav__icon" aria-hidden="true">01</span>
+                <span>Overview<small>Repair summary</small></span>
+              </a>
+              <a class="customer-nav__link" href="#booking-section" data-customer-nav>
+                <span class="customer-nav__icon" aria-hidden="true">02</span>
+                <span>Book a repair<small>Start a new request</small></span>
+              </a>
+              <a class="customer-nav__link" href="#repairs-title" data-customer-nav>
+                <span class="customer-nav__icon" aria-hidden="true">03</span>
+                <span>Repair history<small>Track your requests</small></span>
+              </a>
+              <a class="customer-nav__link" href="#account-details" data-customer-nav>
+                <span class="customer-nav__icon" aria-hidden="true">04</span>
+                <span>My profile<small>Contact information</small></span>
+              </a>
+            </nav>
+            <div class="customer-sidebar__footer">
+              <span class="customer-sidebar__privacy">Your repair details are private to your account.</span>
+              <button class="button button--quiet button--small" id="sign-out" type="button">
+                Sign out
               </button>
             </div>
+          </aside>
+
+          <div class="customer-dashboard-content">
+            <section class="dashboard-welcome" id="dashboard-overview" aria-labelledby="dashboard-heading">
+              <div>
+                <p class="eyebrow">CUSTOMER DASHBOARD</p>
+                <h2 id="dashboard-heading">Welcome back, <span id="customer-label"></span></h2>
+                <p class="dashboard-greeting">Your repairs and updates, together in one place.</p>
+              </div>
+              <a class="button dashboard-book-action" href="#booking-section">Book a Repair</a>
+            </section>
+
+            <section class="overview-grid" aria-label="Your repair overview">
+              <article class="overview-card overview-card--total">
+                <span class="overview-label">Total requests</span>
+                <strong id="stat-total" class="overview-value">—</strong>
+                <span class="overview-detail">All your repair requests</span>
+              </article>
+              <article class="overview-card overview-card--pending">
+                <span class="overview-label">Pending</span>
+                <strong id="stat-pending" class="overview-value">—</strong>
+                <span class="overview-detail">Awaiting the next update</span>
+              </article>
+              <article class="overview-card overview-card--progress">
+                <span class="overview-label">In progress</span>
+                <strong id="stat-progress" class="overview-value">—</strong>
+                <span class="overview-detail">Being checked or repaired</span>
+              </article>
+              <article class="overview-card overview-card--completed">
+                <span class="overview-label">Completed</span>
+                <strong id="stat-completed" class="overview-value">—</strong>
+                <span class="overview-detail">Finished repair requests</span>
+              </article>
+            </section>
+
+            <div class="workspace-bar">
+              <p class="workspace-email">
+                <span class="eyebrow">SIGNED IN AS</span>
+                <strong id="workspace-customer-label"></strong>
+              </p>
+            </div>
+
+            <details class="client-card profile-card" id="account-details">
+              <summary class="profile-summary">
+                <span>
+                  <span class="eyebrow">ACCOUNT DETAILS</span>
+                  <strong id="profile-title">Your contact details</strong>
+                </span>
+                <span class="profile-summary-action">Edit profile</span>
+              </summary>
+              <form id="profile-form" class="client-form profile-form">
+                <label>
+                  Full name <span class="required-indicator">Required</span>
+                  <input name="display_name" type="text" autocomplete="name" required maxlength="160" />
+                </label>
+                <label>
+                  Phone number <span class="label-optional">Optional</span>
+                  <input
+                    name="phone"
+                    type="tel"
+                    autocomplete="tel"
+                    inputmode="tel"
+                    placeholder="09XX XXX XXXX or +639XX XXX XXXX"
+                    aria-describedby="profile-phone-help"
+                    maxlength="24"
+                  />
+                  <small class="field-help" id="profile-phone-help">
+                    Philippine mobile number; enter 09XXXXXXXXX or +639XXXXXXXXX.
+                  </small>
+                </label>
+                <p id="profile-email" class="profile-email form-span"></p>
+                <button class="button button--quiet" type="submit">Save contact details</button>
+              </form>
+            </details>
+
+            <section class="client-card booking-card" id="booking-section" aria-labelledby="booking-title">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">NEW REQUEST</p>
+                  <h2 id="booking-title">Book a repair</h2>
+                </div>
+                <span class="card-index">01</span>
+              </div>
+              <p class="card-copy">
+                Tell us about your device. A photo is optional and can help our team
+                understand the issue.
+              </p>
+              <form id="booking-form" class="client-form booking-form">
+                <fieldset class="booking-group">
+                  <legend>Device details</legend>
+                  <div class="form-grid">
+                    <label>
+                      Device type <span class="required-indicator">Required</span>
+                      <select name="device_type" required>
+                        <option value="">Choose device type</option>
+                        <option>Smartphone</option>
+                        <option>Tablet</option>
+                        <option>Smartwatch</option>
+                        <option>Other device</option>
+                      </select>
+                    </label>
+                    <label>
+                      Brand <span class="required-indicator">Required</span>
+                      <input
+                        name="brand"
+                        type="text"
+                        required
+                        maxlength="100"
+                        placeholder="e.g. Apple, Samsung, Google"
+                      />
+                    </label>
+                    <label class="form-span">
+                      Model <span class="required-indicator">Required</span>
+                      <input
+                        name="model"
+                        type="text"
+                        required
+                        maxlength="160"
+                        placeholder="e.g. iPhone 14, Galaxy S23"
+                      />
+                    </label>
+                  </div>
+                </fieldset>
+                <fieldset class="booking-group">
+                  <legend>Repair details</legend>
+                  <div class="form-grid">
+                    <label class="form-span">
+                      Repair service <span class="label-optional">Optional</span>
+                      <span class="service-picker">
+                        <input
+                          id="service-search"
+                          type="search"
+                          autocomplete="off"
+                          placeholder="Search services by name or category"
+                          role="combobox"
+                          aria-autocomplete="list"
+                          aria-expanded="false"
+                          aria-controls="service-options"
+                        />
+                        <button
+                          id="service-clear"
+                          class="service-clear"
+                          type="button"
+                          aria-label="Clear selected repair service"
+                          hidden
+                        >
+                          ×
+                        </button>
+                        <select
+                          name="service_id"
+                          id="service-select"
+                          class="visually-hidden"
+                          tabindex="-1"
+                          aria-hidden="true"
+                        >
+                          <option value="">Other / not listed</option>
+                        </select>
+                        <span
+                          id="service-options"
+                          class="service-options"
+                          role="listbox"
+                          aria-label="Matching repair services"
+                          hidden
+                        ></span>
+                      </span>
+                      <span
+                        id="service-selection-status"
+                        class="field-help"
+                        aria-live="polite"
+                      >
+                        No service selected. You can also describe the issue below.
+                      </span>
+                    </label>
+                    <label class="form-span">
+                      Describe the issue <span class="required-indicator">Required</span>
+                      <textarea
+                        name="reported_issue"
+                        rows="5"
+                        required
+                        maxlength="5000"
+                        placeholder="What happened, when did it start, and what have you noticed?"
+                      ></textarea>
+                    </label>
+                  </div>
+                </fieldset>
+                <fieldset class="booking-group">
+                  <legend>Photos</legend>
+                  <label class="photo-dropzone" for="repair-photos">
+                    <span class="photo-dropzone-icon" aria-hidden="true">＋</span>
+                    <span>
+                      <strong>Add photos of the issue</strong>
+                      <small>Optional · up to 5 images · 5 MB each</small>
+                    </span>
+                    <input
+                      id="repair-photos"
+                      name="photos"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic"
+                      multiple
+                    />
+                  </label>
+                  <p class="photo-help">
+                    JPEG, PNG, WebP, or HEIC. Avoid including passwords or other
+                    sensitive personal information.
+                  </p>
+                  <div
+                    class="photo-preview-list"
+                    id="photo-preview-list"
+                    aria-live="polite"
+                  ></div>
+                </fieldset>
+                <p class="form-message" id="booking-message" aria-live="polite"></p>
+                <button
+                  class="button booking-submit"
+                  id="booking-submit"
+                  type="submit"
+                >
+                  <span class="button-label">Submit repair request</span>
+                  <span class="button-loading" aria-hidden="true">Submitting…</span>
+                </button>
+              </form>
+            </section>
+
+            <section class="client-card repairs-card" aria-labelledby="repairs-title">
+              <div class="card-heading">
+                <div>
+                  <p class="eyebrow">YOUR HISTORY</p>
+                  <h2 id="repairs-title">Repair requests</h2>
+                </div>
+                <div class="history-actions">
+                  <span id="repair-count-label" class="repair-count-label"></span>
+                  <button class="button button--quiet button--small" id="refresh-repairs" type="button">
+                    Refresh
+                  </button>
+                </div>
+              </div>
+              <div class="repair-list" id="repair-list" aria-live="polite"></div>
+            </section>
           </div>
-          <div class="repair-list" id="repair-list" aria-live="polite"></div>
-        </section>
+        </div>
       </section>
       <footer class="client-footer">
         <span>Private customer portal · R&amp;D Cellphone Repair</span>

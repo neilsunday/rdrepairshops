@@ -9,7 +9,7 @@
     overview: {
       title: "Overview",
       description:
-        "A live snapshot of the repair workflow.",
+        "See repair progress at a glance, then open the section you need.",
     },
     repairs: {
       title: "Repair Management",
@@ -1381,35 +1381,112 @@ ${reportItems}
 
     const renderOverview = (overview) => {
       const view = host.querySelector('[data-admin-view="overview"]');
-      const metrics = makeElement("section", "metric-grid");
       const production = overview.mode === "production";
+      const metrics = makeElement("section", "metric-grid");
       metrics.setAttribute(
         "aria-label",
-        production ? "Repair metrics" : "Demo repair metrics",
+        production ? "Live repair status counts" : "Demo repair status counts",
       );
+
       const metricDefinitions = [
-        ["Open requests", overview.metrics.open],
-        ["Awaiting approval", overview.metrics.awaitingApproval],
-        ["In progress", overview.metrics.inProgress],
-        ["Ready for pickup", overview.metrics.readyForPickup],
+        {
+          label: "Open repairs",
+          value: overview.metrics.open,
+          note: "Not completed or cancelled",
+          status: "all",
+          tone: "open",
+        },
+        {
+          label: "Waiting for approval",
+          value: overview.metrics.awaitingApproval,
+          note: "Customer approval is needed",
+          status: "awaiting_approval",
+          tone: "waiting",
+        },
+        {
+          label: "Being repaired",
+          value: overview.metrics.inProgress,
+          note: "Currently in progress",
+          status: "in_progress",
+          tone: "progress",
+        },
+        {
+          label: "Ready for pickup",
+          value: overview.metrics.readyForPickup,
+          note: "Ready for the customer",
+          status: "ready_for_pickup",
+          tone: "ready",
+        },
       ];
-      metricDefinitions.forEach(([label, value]) => {
-        const item = makeElement("article", "metric-item");
+      metricDefinitions.forEach(({ label, value, note, status, tone }) => {
+        const item = makeElement(
+          "button",
+          `metric-item metric-item--action metric-item--${tone}`,
+        );
+        item.type = "button";
+        item.dataset.overviewStatus = status;
+        item.setAttribute("aria-label", `${label}: ${value}. Open repair list.`);
         item.append(
-          makeElement("p", "metric-item__label", label),
-          makeElement(
-            "p",
-            "metric-item__value",
-            String(value).padStart(2, "0"),
-          ),
-          makeElement(
-            "p",
-            "metric-item__note",
-            production ? "Live request count" : "Demo fixture count",
-          ),
+          makeElement("span", "metric-item__label", label),
+          makeElement("span", "metric-item__value", String(value)),
+          makeElement("span", "metric-item__note", note),
+          makeElement("span", "metric-item__action", "View requests"),
         );
         metrics.append(item);
       });
+
+      const quickActions = makeElement("section", "overview-shortcuts");
+      quickActions.setAttribute("aria-labelledby", "overview-shortcuts-title");
+      const shortcutHeading = makeElement("div", "overview-section-heading");
+      const shortcutTitle = makeElement("h2", "", "Quick access");
+      shortcutTitle.id = "overview-shortcuts-title";
+      shortcutHeading.append(
+        shortcutTitle,
+        makeElement("p", "", "Open important tools directly."),
+      );
+      const shortcutGrid = makeElement("div", "overview-shortcuts__grid");
+      [
+        {
+          view: "repairs",
+          title: "Manage repairs",
+          description: "Review requests and update repair progress.",
+        },
+        {
+          view: "notes",
+          title: "Completed proofs",
+          description: "Review service notes and 10-repair reports.",
+        },
+        {
+          view: "notebook",
+          title: "Client notebook",
+          description: "Record purchases, services, and client notes.",
+        },
+        {
+          view: "settings",
+          title: "Business profile",
+          description: "Update public contact details and shop hours.",
+        },
+      ].forEach(({ view: target, title, description }) => {
+        const action = makeElement("button", "overview-shortcut");
+        action.type = "button";
+        action.dataset.viewTarget = target;
+        action.append(
+          makeElement("span", "overview-shortcut__title", title),
+          makeElement("span", "overview-shortcut__description", description),
+          makeElement("span", "overview-shortcut__arrow", "Open section"),
+        );
+        shortcutGrid.append(action);
+      });
+      quickActions.append(shortcutHeading, shortcutGrid);
+
+      const overviewHeading = makeElement("div", "overview-hero");
+      overviewHeading.append(makeHeading(moduleDefinitions.overview));
+      const refresh = makeElement("button", "admin-button overview-refresh", "Refresh");
+      refresh.type = "button";
+      refresh.dataset.refreshOverview = "true";
+      refresh.setAttribute("aria-label", "Refresh overview data");
+      overviewHeading.append(refresh);
+
       const grid = makeElement("div", "overview-grid");
       const recentPanel = makeElement("section", "panel");
       const panelHeading = makeElement("div", "panel-heading");
@@ -1422,11 +1499,7 @@ ${reportItems}
         ),
         makeElement("h2", "", "Recent repair requests"),
       );
-      const viewAll = makeElement(
-        "button",
-        "inline-action",
-        "View all repairs",
-      );
+      const viewAll = makeElement("button", "inline-action", "View all repairs");
       viewAll.type = "button";
       viewAll.dataset.viewTarget = "repairs";
       panelHeading.append(titleGroup, viewAll);
@@ -1436,13 +1509,12 @@ ${reportItems}
           "p",
           "panel-note",
           production
-            ? "The latest repair requests in your shop."
-            : "Synthetic records only; no customer data is connected.",
+            ? "Latest customer requests and their current status."
+            : "Preview records only; this list is not connected to customer data.",
         ),
-      );
-      recentPanel.append(
         createTable(moduleDefinitions.repairs, overview.repairs, false),
       );
+
       const activityPanel = makeElement("section", "panel");
       activityPanel.append(
         makeElement(
@@ -1456,9 +1528,9 @@ ${reportItems}
           "panel-note",
           production
             ? overview.activity.length
-              ? "Recent owner and system actions."
+              ? "Latest owner and system updates."
               : "No activity has been recorded yet."
-            : "No real activity has been performed.",
+            : "Preview activity only; no real updates have been performed.",
         ),
       );
       const list = makeElement("ol", "activity-list");
@@ -1473,18 +1545,36 @@ ${reportItems}
         item.append(copy);
         list.append(item);
       });
+      if (!overview.activity.length) {
+        list.append(
+          makeElement(
+            "li",
+            "activity-empty",
+            production
+              ? "Activity will appear here as repairs are updated."
+              : "Preview activity will appear here.",
+          ),
+        );
+      }
       activityPanel.append(list);
       grid.append(recentPanel, activityPanel);
+
       view.replaceChildren(
-        makeHeading(moduleDefinitions.overview),
+        overviewHeading,
+        makeElement(
+          "p",
+          "overview-metrics-heading",
+          production ? "REPAIR STATUS · LIVE COUNTS" : "REPAIR STATUS · PREVIEW COUNTS",
+        ),
         metrics,
+        quickActions,
         grid,
         makeElement(
           "p",
           "view-footnote",
           production
-            ? "Overview values are loaded from the connected Supabase project."
-            : "All values are derived from synthetic demo fixtures and are not shop records.",
+            ? "Counts and recent records are loaded from your connected Supabase project."
+            : "All preview values are examples, not real customer or repair records.",
         ),
       );
     };
@@ -2054,6 +2144,30 @@ ${reportItems}
       }
     });
     host.addEventListener("click", (event) => {
+      const refreshOverview = event.target.closest("[data-refresh-overview]");
+      if (refreshOverview && activeModule === "overview") {
+        refreshOverview.disabled = true;
+        refreshOverview.textContent = "Refreshing…";
+        loadModule("overview").finally(() => {
+          const currentRefresh = host.querySelector("[data-refresh-overview]");
+          if (currentRefresh) {
+            currentRefresh.disabled = false;
+            currentRefresh.textContent = "Refresh";
+          }
+        });
+        return;
+      }
+      const overviewMetric = event.target.closest("[data-overview-status]");
+      if (overviewMetric && activeModule === "overview") {
+        const queryState = getQueryState("repairs");
+        queryState.search = "";
+        queryState.filters = {
+          status: overviewMetric.dataset.overviewStatus,
+          priority: "all",
+        };
+        loadModule("repairs", 0);
+        return;
+      }
       const downloadProofs = event.target.closest(
         "[data-download-completion-proofs]",
       );

@@ -878,17 +878,77 @@
       );
       authPanel.hidden = true;
       workspace.hidden = false;
+      document.body.dataset.clientSignedIn = "true";
       showGlobalMessage("");
-      if (new URLSearchParams(window.location.search).get("flow") === "book")
+      if (new URLSearchParams(window.location.search).get("flow") === "book") {
+        setActiveCustomerNavigation("booking-section");
         document.querySelector("#booking-title").scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
+      } else {
+        setActiveCustomerNavigation("dashboard-overview");
+      }
     } catch (error) {
       currentUser = null;
       throw error;
     }
   };
+
+  const setActiveCustomerNavigation = (targetId) => {
+    document.querySelectorAll("[data-customer-nav]").forEach((link) => {
+      const isActive = link.hash === `#${targetId}`;
+      link.classList.toggle("is-active", isActive);
+      if (isActive) link.setAttribute("aria-current", "location");
+      else link.removeAttribute("aria-current");
+    });
+  };
+
+  let pendingNavigationTarget = "";
+  let navigationResetTimer;
+  document.querySelectorAll("[data-customer-nav]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      const target = document.querySelector(link.hash);
+      if (!target) return;
+      if (target.matches("details")) target.open = true;
+      pendingNavigationTarget = target.id;
+      window.clearTimeout(navigationResetTimer);
+      navigationResetTimer = window.setTimeout(
+        () => (pendingNavigationTarget = ""),
+        1200,
+      );
+      window.history.replaceState(null, "", link.hash);
+      setActiveCustomerNavigation(target.id);
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+  window.addEventListener("scrollend", () => {
+    pendingNavigationTarget = "";
+    window.clearTimeout(navigationResetTimer);
+  });
+
+  const navigationTargets = [
+    "dashboard-overview",
+    "booking-section",
+    "repairs-title",
+    "account-details",
+  ]
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  if ("IntersectionObserver" in window) {
+    const navigationObserver = new IntersectionObserver(
+      (entries) => {
+        if (pendingNavigationTarget) return;
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+        if (visible) setActiveCustomerNavigation(visible.target.id);
+      },
+      { rootMargin: "-18% 0px -68% 0px", threshold: [0, 0.2, 0.5, 1] },
+    );
+    navigationTargets.forEach((target) => navigationObserver.observe(target));
+  }
 
   const selectedPhotos = () => Array.from(photoInput.files || []);
 
@@ -1181,6 +1241,7 @@
       const { error } = await client.auth.signOut();
       if (error) throw error;
       currentUser = null;
+      delete document.body.dataset.clientSignedIn;
       workspace.hidden = true;
       authPanel.hidden = false;
       document.querySelector("#customer-label").textContent = "";

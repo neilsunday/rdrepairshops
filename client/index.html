@@ -109,37 +109,65 @@
       </section>
 
       <section class="client-workspace" id="workspace" hidden>
-        <div class="workspace-bar">
+        <section class="dashboard-welcome" aria-labelledby="dashboard-heading">
           <div>
-            <p class="eyebrow">SIGNED IN AS</p>
-            <strong id="customer-label"></strong>
+            <p class="eyebrow">CUSTOMER DASHBOARD</p>
+            <h2 id="dashboard-heading">Welcome back, <span id="customer-label"></span></h2>
+            <p class="dashboard-greeting">Here’s a quick look at your repairs.</p>
           </div>
+          <a class="button dashboard-book-action" href="#booking-title">Book a Repair</a>
+        </section>
+
+        <section class="overview-grid" aria-label="Your repair overview">
+          <article class="overview-card">
+            <span class="overview-label">Total requests</span>
+            <strong id="stat-total" class="overview-value">—</strong>
+          </article>
+          <article class="overview-card">
+            <span class="overview-label">Pending</span>
+            <strong id="stat-pending" class="overview-value">—</strong>
+          </article>
+          <article class="overview-card">
+            <span class="overview-label">In progress</span>
+            <strong id="stat-progress" class="overview-value">—</strong>
+          </article>
+          <article class="overview-card">
+            <span class="overview-label">Completed</span>
+            <strong id="stat-completed" class="overview-value">—</strong>
+          </article>
+        </section>
+
+        <div class="workspace-bar">
+          <p class="workspace-email">
+            <span class="eyebrow">SIGNED IN AS</span>
+            <strong id="workspace-customer-label"></strong>
+          </p>
           <button class="button button--quiet button--small" id="sign-out" type="button">
             Sign out
           </button>
         </div>
 
-        <section class="client-card profile-card" aria-labelledby="profile-title">
-          <div class="card-heading">
-            <div>
-              <p class="eyebrow">ACCOUNT DETAILS</p>
-              <h2 id="profile-title">Your contact details</h2>
-            </div>
-            <span class="card-index">01</span>
-          </div>
+        <details class="client-card profile-card">
+          <summary class="profile-summary">
+            <span>
+              <span class="eyebrow">ACCOUNT DETAILS</span>
+              <strong id="profile-title">Your contact details</strong>
+            </span>
+            <span class="profile-summary-action">Edit profile</span>
+          </summary>
           <form id="profile-form" class="client-form profile-form">
             <label>
-              Full name
+              Full name <span class="required-indicator">Required</span>
               <input name="display_name" type="text" autocomplete="name" required maxlength="160" />
             </label>
             <label>
-              Phone number
+              Phone number <span class="label-optional">Optional</span>
               <input name="phone" type="tel" autocomplete="tel" maxlength="40" />
             </label>
-            <p class="profile-email" id="profile-email"></p>
+            <p id="profile-email" class="profile-email form-span"></p>
             <button class="button button--quiet" type="submit">Save contact details</button>
           </form>
-        </section>
+        </details>
 
         <section class="client-card booking-card" aria-labelledby="booking-title">
           <div class="card-heading">
@@ -154,37 +182,64 @@
             understand the issue.
           </p>
           <form id="booking-form" class="client-form booking-form">
-            <div class="form-grid">
-              <label>
-                Device type
-                <select name="device_type" required>
-                  <option value="">Choose device type</option>
-                  <option>Smartphone</option>
-                  <option>Tablet</option>
-                  <option>Smartwatch</option>
-                  <option>Other device</option>
-                </select>
-              </label>
-              <label>
-                Brand
-                <input name="brand" type="text" required maxlength="100" placeholder="e.g. Apple" />
-              </label>
-              <label>
-                Model
-                <input name="model" type="text" required maxlength="160" placeholder="e.g. iPhone 14" />
-              </label>
-              <label>
-                Repair service
-                <select name="service_id" id="service-select">
-                  <option value="">Other / not listed</option>
-                </select>
-              </label>
-              <label class="form-span">
-                What is wrong with your device?
-                <textarea name="reported_issue" rows="5" required maxlength="5000" placeholder="Describe the problem, when it started, and anything else we should know."></textarea>
-              </label>
-              <label class="form-span">
-                Photos of the issue <span class="label-optional">Optional · up to 5 · 5 MB each</span>
+            <fieldset class="booking-group">
+              <legend>Device details</legend>
+              <div class="form-grid">
+                <label>
+                  Device type <span class="required-indicator">Required</span>
+                  <select name="device_type" required>
+                    <option value="">Choose device type</option>
+                    <option>Smartphone</option>
+                    <option>Tablet</option>
+                    <option>Smartwatch</option>
+                    <option>Other device</option>
+                  </select>
+                </label>
+                <label>
+                  Brand <span class="required-indicator">Required</span>
+                  <input name="brand" type="text" required maxlength="100" placeholder="e.g. Apple, Samsung, Google" />
+                </label>
+                <label class="form-span">
+                  Model <span class="required-indicator">Required</span>
+                  <input name="model" type="text" required maxlength="160" placeholder="e.g. iPhone 14, Galaxy S23" />
+                </label>
+              </div>
+            </fieldset>
+            <fieldset class="booking-group">
+              <legend>Repair details</legend>
+              <div class="form-grid">
+                <label class="form-span">
+                  Repair service <span class="label-optional">Optional</span>
+                  <span class="service-picker">
+                    <input
+                      id="service-search"
+                      type="search"
+                      autocomplete="off"
+                      placeholder="Search services by name or category"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded="false"
+                      aria-controls="service-options"
+                    />
+                    <button id="service-clear" class="service-clear" type="button" aria-label="Clear selected repair service" hidden>×</button>
+                    <select name="service_id" id="service-select" class="visually-hidden" tabindex="-1" aria-hidden="true">
+                      <option value="">Other / not listed</option>
+                    </select>
+                    <span id="service-options" class="service-options" role="listbox" aria-label="Matching repair services" hidden></span>
+                  </span>
+                  <span id="service-selection-status" class="field-help" aria-live="polite">No service selected. You can also describe the issue below.</span>
+                </label>
+                <label class="form-span">
+                  Describe the issue <span class="required-indicator">Required</span>
+                  <textarea name="reported_issue" rows="5" required maxlength="5000" placeholder="What happened, when did it start, and what have you noticed?"></textarea>
+                </label>
+              </div>
+            </fieldset>
+            <fieldset class="booking-group">
+              <legend>Photos</legend>
+              <label class="photo-dropzone" for="repair-photos">
+                <span class="photo-dropzone-icon" aria-hidden="true">＋</span>
+                <span><strong>Add photos of the issue</strong><small>Optional · up to 5 images · 5 MB each</small></span>
                 <input
                   id="repair-photos"
                   name="photos"
@@ -193,10 +248,14 @@
                   multiple
                 />
               </label>
-            </div>
-            <p class="photo-help">Accepted: JPEG, PNG, WebP, or HEIC. Please avoid photos containing passwords or sensitive personal information.</p>
+              <p class="photo-help">JPEG, PNG, WebP, or HEIC. Avoid including passwords or other sensitive personal information.</p>
+              <div class="photo-preview-list" id="photo-preview-list" aria-live="polite"></div>
+            </fieldset>
             <p class="form-message" id="booking-message" aria-live="polite"></p>
-            <button class="button" id="booking-submit" type="submit">Submit repair request</button>
+            <button class="button booking-submit" id="booking-submit" type="submit">
+              <span class="button-label">Submit repair request</span>
+              <span class="button-loading" aria-hidden="true">Submitting…</span>
+            </button>
           </form>
         </section>
 
@@ -206,9 +265,12 @@
               <p class="eyebrow">YOUR HISTORY</p>
               <h2 id="repairs-title">Repair requests</h2>
             </div>
-            <button class="button button--quiet button--small" id="refresh-repairs" type="button">
-              Refresh
-            </button>
+            <div class="history-actions">
+              <span id="repair-count-label" class="repair-count-label"></span>
+              <button class="button button--quiet button--small" id="refresh-repairs" type="button">
+                Refresh
+              </button>
+            </div>
           </div>
           <div class="repair-list" id="repair-list" aria-live="polite"></div>
         </section>

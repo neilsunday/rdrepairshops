@@ -23,9 +23,22 @@
   const bookingSubmit = document.querySelector("#booking-submit");
   const repairList = document.querySelector("#repair-list");
   const serviceSelect = document.querySelector("#service-select");
+  const serviceSearch = document.querySelector("#service-search");
+  const serviceOptions = document.querySelector("#service-options");
+  const serviceClear = document.querySelector("#service-clear");
+  const serviceSelectionStatus = document.querySelector(
+    "#service-selection-status",
+  );
+  const photoInput = document.querySelector("#repair-photos");
+  const photoPreviewList = document.querySelector("#photo-preview-list");
   let client;
   let currentUser;
   let signingUp = false;
+  let repairServices = [];
+  let selectedServiceLabel = "";
+  let activeServiceIndex = -1;
+  let previewUrls = [];
+  let pendingPhotoUpload = null;
 
   const showGlobalMessage = (message, error = false) => {
     globalNotice.hidden = error || !message;
@@ -74,13 +87,240 @@
       .eq("status", "active")
       .order("sort_order", { ascending: true });
     if (error) throw error;
+    repairServices = data || [];
     serviceSelect.replaceChildren(new Option("Other / not listed", ""));
-    for (const service of data || []) {
+    for (const service of repairServices) {
       const option = new Option(
         `${service.name} · ${service.category}`,
         service.id,
       );
       serviceSelect.append(option);
+    }
+    renderServiceOptions("");
+  };
+
+  const serviceLabel = (service) =>
+    service ? `${service.name} · ${service.category}` : "Other / not listed";
+
+  const selectRepairService = (service) => {
+    serviceSelect.value = service?.id || "";
+    selectedServiceLabel = serviceLabel(service);
+    serviceSearch.value = selectedServiceLabel;
+    serviceClear.hidden = false;
+    serviceSelectionStatus.textContent = service
+      ? `Selected: ${selectedServiceLabel}`
+      : "Other / not listed selected. Describe the issue below.";
+    serviceOptions.hidden = true;
+    serviceSearch.setAttribute("aria-expanded", "false");
+    serviceSearch.removeAttribute("aria-activedescendant");
+    activeServiceIndex = -1;
+  };
+
+  const renderServiceOptions = (query) => {
+    const term = query.trim().toLocaleLowerCase();
+    const matches = repairServices.filter((service) =>
+      `${service.name} ${service.category}`.toLocaleLowerCase().includes(term),
+    );
+    const options = [
+      { id: "", name: "Other / not listed", category: "", fallback: true },
+      ...matches,
+    ];
+    serviceOptions.replaceChildren();
+    options.forEach((service, index) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.id = `service-option-${index}`;
+      option.className = "service-option";
+      option.setAttribute("role", "option");
+      option.setAttribute(
+        "aria-selected",
+        String(serviceSelect.value === service.id),
+      );
+      option.append(
+        makeText("span", "service-option-name", service.name),
+        service.category
+          ? makeText("span", "service-option-category", service.category)
+          : makeText("span", "service-option-category", "Describe your issue"),
+      );
+      option.addEventListener("click", () => selectRepairService(service.fallback ? null : service));
+      serviceOptions.append(option);
+    });
+    if (term && matches.length === 0)
+      serviceSelectionStatus.textContent =
+        "No services match that search. Choose Other / not listed instead.";
+    activeServiceIndex = -1;
+    if (!serviceOptions.hidden)
+      serviceSearch.setAttribute("aria-expanded", "true");
+  };
+
+  const openServiceOptions = (query = "") => {
+    renderServiceOptions(query);
+    serviceOptions.hidden = false;
+    serviceSearch.setAttribute("aria-expanded", "true");
+  };
+
+  const closeServiceOptions = () => {
+    serviceOptions.hidden = true;
+    serviceSearch.setAttribute("aria-expanded", "false");
+    serviceSearch.removeAttribute("aria-activedescendant");
+    activeServiceIndex = -1;
+  };
+
+  const setActiveServiceOption = (index) => {
+    const options = [...serviceOptions.querySelectorAll('[role="option"]')];
+    if (!options.length) return;
+    activeServiceIndex = (index + options.length) % options.length;
+    options.forEach((option, optionIndex) => {
+      option.classList.toggle("is-active", optionIndex === activeServiceIndex);
+    });
+    serviceSearch.setAttribute(
+      "aria-activedescendant",
+      options[activeServiceIndex].id,
+    );
+    options[activeServiceIndex].scrollIntoView({ block: "nearest" });
+  };
+
+  serviceSearch.addEventListener("focus", () => {
+    openServiceOptions(serviceSelect.value ? "" : serviceSearch.value);
+    serviceSearch.select();
+  });
+
+  serviceSearch.addEventListener("input", () => {
+    if (serviceSearch.value !== selectedServiceLabel) {
+      serviceSelect.value = "";
+      selectedServiceLabel = "";
+      serviceClear.hidden = true;
+      serviceSelectionStatus.textContent =
+        "No service selected. You can also describe the issue below.";
+    }
+    openServiceOptions(serviceSearch.value);
+  });
+
+  serviceSearch.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (serviceOptions.hidden) openServiceOptions(serviceSearch.value);
+      setActiveServiceOption(activeServiceIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveServiceOption(activeServiceIndex - 1);
+    } else if (event.key === "Enter" && !serviceOptions.hidden) {
+      event.preventDefault();
+      const activeOption = serviceOptions.querySelector(
+        `#${CSS.escape(`service-option-${activeServiceIndex}`)}`,
+      );
+      activeOption?.click();
+    } else if (event.key === "Escape") {
+      closeServiceOptions();
+    }
+  });
+
+  serviceClear.addEventListener("click", () => {
+    serviceSelect.value = "";
+    selectedServiceLabel = "";
+    serviceSearch.value = "";
+    serviceClear.hidden = true;
+    serviceSelectionStatus.textContent =
+      "No service selected. You can also describe the issue below.";
+    serviceSearch.focus();
+    openServiceOptions("");
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".service-picker")) closeServiceOptions();
+  });
+
+  const updateRepairStats = (requests) => {
+    const completed = requests.filter(
+      (request) => request.status === "completed",
+    ).length;
+    const inProgress = requests.filter((request) =>
+      ["approved", "in_progress", "ready_for_pickup"].includes(request.status),
+    ).length;
+    const pending = requests.filter((request) =>
+      ["submitted", "inspecting", "awaiting_approval"].includes(
+        request.status,
+      ),
+    ).length;
+    document.querySelector("#stat-total").textContent = String(requests.length);
+    document.querySelector("#stat-pending").textContent = String(pending);
+    document.querySelector("#stat-progress").textContent = String(inProgress);
+    document.querySelector("#stat-completed").textContent = String(completed);
+    document.querySelector("#repair-count-label").textContent =
+      `${requests.length} ${requests.length === 1 ? "request" : "requests"}`;
+  };
+
+  const updateBookingAfterSuccess = () => {
+    bookingForm.reset();
+    pendingPhotoUpload = null;
+    bookingForm.querySelectorAll("fieldset").forEach((group) => {
+      group.disabled = false;
+    });
+    document.querySelector("#booking-submit .button-label").textContent =
+      "Submit repair request";
+    document.querySelector("#booking-submit").classList.remove("is-submitting");
+    serviceSelect.value = "";
+    selectedServiceLabel = "";
+    serviceSearch.value = "";
+    serviceClear.hidden = true;
+    serviceSelectionStatus.textContent =
+      "No service selected. You can also describe the issue below.";
+    closeServiceOptions();
+    renderPhotoPreviews([]);
+  };
+
+  const showRepairLoadError = (error) => {
+    const state = makeText("div", "empty-state empty-state--error");
+    state.append(
+      makeText("h3", "", "Repair history isn’t available"),
+      makeText(
+        "p",
+        "",
+        `We couldn’t load your repair updates. ${friendlyError(error)}`,
+      ),
+    );
+    const retry = makeText("button", "button button--quiet empty-state-action", "Try again");
+    retry.type = "button";
+    retry.addEventListener("click", () =>
+      document.querySelector("#refresh-repairs").click(),
+    );
+    state.append(retry);
+    repairList.replaceChildren(state);
+  };
+
+  const uploadPendingPhotos = async () => {
+    const { request, files } = pendingPhotoUpload;
+    for (const [index, file] of files.entries()) {
+      try {
+        await uploadPhoto(request, file);
+      } catch (error) {
+        pendingPhotoUpload = { request, files: files.slice(index) };
+        bookingForm.querySelectorAll("fieldset").forEach((group) => {
+          group.disabled = true;
+        });
+        bookingSubmit.querySelector(".button-label").textContent =
+          "Retry photo uploads";
+        throw new Error(
+          `Request ${request.reference_number} is saved, but ${pendingPhotoUpload.files.length} photo(s) could not upload: ${friendlyError(error)}. Your form is preserved; retry without creating a duplicate request.`,
+        );
+      }
+    }
+    const referenceNumber = request.reference_number;
+    updateBookingAfterSuccess();
+    setFormMessage(
+      bookingMessage,
+      `Request ${referenceNumber} is submitted${files.length ? " with the selected photos attached" : ""}. You can follow its updates below.`,
+    );
+    try {
+      await loadRepairs();
+    } catch (refreshError) {
+      console.error("Booking succeeded but repair list refresh failed:", refreshError);
+      showRepairLoadError(refreshError);
+      setFormMessage(
+        bookingMessage,
+        `Request ${referenceNumber} was submitted, but your list could not refresh. Use Refresh to try again.`,
+        true,
+      );
     }
   };
 
@@ -88,30 +328,60 @@
     const article = makeText("article", "repair-card");
     const top = document.createElement("div");
     top.className = "repair-card__top";
-    const title = makeText("h3", "", request.reference_number);
-    const status = makeText("span", "status-badge", formatStatus(request.status));
-    top.append(title, status);
+    const titleGroup = document.createElement("div");
+    titleGroup.className = "repair-card__title-group";
+    titleGroup.append(
+      makeText("p", "repair-reference", request.reference_number),
+      makeText(
+        "h3",
+        "",
+        [request.brand, request.model].filter(Boolean).join(" ") ||
+          request.device_type ||
+          "Repair request",
+      ),
+    );
+    const status = makeText(
+      "span",
+      `status-badge status-badge--${String(request.status || "submitted").replaceAll("_", "-")}`,
+      formatStatus(request.status),
+    );
+    top.append(titleGroup, status);
     article.append(top);
 
     article.append(
       makeText(
         "p",
-        "repair-meta",
-        `${request.device_type} · ${request.brand} ${request.model} · ${request.service_name_snapshot || "Other / not listed"}`,
+        "repair-service",
+        `${request.device_type} · ${request.service_name_snapshot || "Other / not listed"}`,
       ),
       makeText("p", "repair-meta", `Submitted ${formatDate(request.submitted_at)}`),
-      makeText("p", "repair-issue", request.reported_issue),
     );
 
-    if (request.customer_visible_note) {
+    if (request.reported_issue) {
+      const issue = document.createElement("details");
+      issue.className = "repair-issue-details";
+      const summary = makeText("summary", "", "Issue description");
+      issue.append(summary, makeText("p", "repair-issue", request.reported_issue));
+      article.append(issue);
+    }
+
+    const latestMessage =
+      request.customer_visible_note ||
+      [...histories].reverse().find((entry) => entry.customer_message)
+        ?.customer_message;
+    if (latestMessage) {
       const update = makeText("p", "repair-message", "");
-      update.append(makeText("strong", "", "Latest update: "));
-      update.append(document.createTextNode(request.customer_visible_note));
+      update.append(makeText("strong", "", "Latest update"));
+      update.append(document.createTextNode(latestMessage));
       article.append(update);
     }
 
     if (histories.length) {
-      article.append(makeText("h4", "repair-meta", "Status updates"));
+      const historyDetails = document.createElement("details");
+      historyDetails.className = "repair-history-details";
+      historyDetails.append(
+        makeText("summary", "", `${histories.length} status ${histories.length === 1 ? "update" : "updates"}`),
+      );
       const list = document.createElement("ol");
       list.className = "repair-history";
       for (const entry of histories) {
@@ -124,7 +394,8 @@
           );
         list.append(line);
       }
-      article.append(list);
+      historyDetails.append(list);
+      article.append(historyDetails);
     }
 
     if (attachments.length) {
@@ -153,7 +424,7 @@
   };
 
   const loadRepairs = async () => {
-    repairList.replaceChildren(makeText("p", "empty-state", "Loading your repair requests…"));
+    repairList.replaceChildren(makeText("p", "empty-state empty-state--loading", "Loading your repair requests…"));
     const { data: requests, error: requestError } = await client
       .from("repair_requests")
       .select(
@@ -162,14 +433,23 @@
       .eq("customer_id", currentUser.id)
       .order("submitted_at", { ascending: false });
     if (requestError) throw requestError;
+    updateRepairStats(requests || []);
     if (!requests?.length) {
-      repairList.replaceChildren(
+      const empty = makeText("div", "empty-state");
+      empty.append(
+        makeText("h3", "", "No repair requests yet"),
         makeText(
           "p",
-          "empty-state",
-          "No repair requests yet. Use Book a repair above to get started.",
+          "",
+          "When you book your first repair, its status and updates will appear here.",
         ),
+        Object.assign(document.createElement("a"), {
+          className: "button button--quiet empty-state-action",
+          href: "#booking-title",
+          textContent: "Book your first repair",
+        }),
       );
+      repairList.replaceChildren(empty);
       return;
     }
 
@@ -239,6 +519,8 @@
     try {
       document.querySelector("#customer-label").textContent =
         profile.display_name || user.email || "Customer";
+      document.querySelector("#workspace-customer-label").textContent =
+        user.email || "Customer account";
       document.querySelector("#profile-form [name=display_name]").value =
         profile.display_name || "";
       document.querySelector("#profile-form [name=phone]").value =
@@ -246,6 +528,10 @@
       document.querySelector("#profile-email").textContent =
         `Email: ${user.email || "Unavailable"}`;
       await Promise.all([loadServices(), loadRepairs()]);
+      document.querySelector("#dashboard-heading").setAttribute(
+        "aria-label",
+        `Welcome back, ${profile.display_name || user.email || "Customer"}`,
+      );
       authPanel.hidden = true;
       workspace.hidden = false;
       showGlobalMessage("");
@@ -260,8 +546,7 @@
     }
   };
 
-  const selectedPhotos = () =>
-    Array.from(document.querySelector("#repair-photos").files || []);
+  const selectedPhotos = () => Array.from(photoInput.files || []);
 
   const validatePhotos = (files) => {
     if (files.length > maxFiles)
@@ -320,6 +605,9 @@
     signingUp = !signingUp;
     signupFields.hidden = !signingUp;
     signupFields.querySelector("[name=display_name]").required = signingUp;
+    document.querySelector("#auth-title").textContent = signingUp
+      ? "Create your account"
+      : "Sign in to continue";
     authSubmit.textContent = signingUp ? "Create account" : "Sign in";
     authToggle.textContent = signingUp ? "I already have an account" : "Create account";
     authForm.querySelector("[name=password]").autocomplete = signingUp
@@ -400,6 +688,8 @@
       if (error) throw error;
       document.querySelector("#customer-label").textContent =
         form.elements.display_name.value.trim();
+      document.querySelector("#workspace-customer-label").textContent =
+        currentUser.email || "Customer account";
       showGlobalMessage("Your contact details have been saved.");
     } catch (error) {
       console.error("Customer profile update failed:", error);
@@ -431,6 +721,29 @@
     }
 
     bookingSubmit.disabled = true;
+    bookingSubmit.classList.add("is-submitting");
+    if (pendingPhotoUpload) {
+      setFormMessage(
+        bookingMessage,
+        `Your request ${pendingPhotoUpload.request.reference_number} is already submitted. Retrying the remaining photo uploads…`,
+      );
+      try {
+        await uploadPendingPhotos();
+      } catch (error) {
+        console.error("Repair photo retry failed:", error);
+        setFormMessage(
+          bookingMessage,
+          `Request ${pendingPhotoUpload.request.reference_number} is saved. Photo upload failed: ${friendlyError(error)}. Your form is preserved; select Retry photo uploads to try again.`,
+          true,
+        );
+        bookingSubmit.querySelector(".button-label").textContent =
+          "Retry photo uploads";
+      } finally {
+        bookingSubmit.disabled = false;
+        bookingSubmit.classList.remove("is-submitting");
+      }
+      return;
+    }
     setFormMessage(bookingMessage, "Submitting your repair request…");
     try {
       const form = new FormData(bookingForm);
@@ -452,33 +765,18 @@
         .single();
       if (error) throw error;
 
-      let uploaded = 0;
-      let uploadFailure = "";
-      for (const file of files) {
-        try {
-          await uploadPhoto(request, file);
-          uploaded += 1;
-        } catch (error) {
-          uploadFailure = `${file.name}: ${friendlyError(error)}`;
-          break;
-        }
-      }
-
-      bookingForm.reset();
-      if (uploadFailure) {
-        setFormMessage(
-          bookingMessage,
-          `Request ${request.reference_number} was submitted. ${uploaded} of ${files.length} photo(s) attached; the next photo failed: ${uploadFailure}`,
-          true,
-        );
+      if (files.length) {
+        pendingPhotoUpload = { request, files };
+        await uploadPendingPhotos();
       } else {
+        updateBookingAfterSuccess();
         setFormMessage(
           bookingMessage,
-          `Request ${request.reference_number} submitted${uploaded ? ` with ${uploaded} photo(s)` : ""}. You can follow its updates below.`,
+          `Request ${request.reference_number} submitted. You can follow its updates below.`,
         );
       }
       try {
-        await loadRepairs();
+        if (!files.length) await loadRepairs();
       } catch (refreshError) {
         console.error("Booking succeeded but repair list refresh failed:", refreshError);
         setFormMessage(
@@ -496,6 +794,7 @@
       setFormMessage(bookingMessage, friendlyError(error), true);
     } finally {
       bookingSubmit.disabled = false;
+      bookingSubmit.classList.remove("is-submitting");
     }
   });
 
@@ -507,6 +806,7 @@
       showGlobalMessage("Your repair requests are up to date.");
     } catch (error) {
       console.error("Customer repair refresh failed:", error);
+      showRepairLoadError(error);
       showGlobalMessage(friendlyError(error), true);
     } finally {
       button.disabled = false;
@@ -522,8 +822,26 @@
       currentUser = null;
       workspace.hidden = true;
       authPanel.hidden = false;
+      document.querySelector("#customer-label").textContent = "";
+      document.querySelector("#workspace-customer-label").textContent = "";
+      document.querySelector("#profile-form").reset();
+      signingUp = false;
+      signupFields.hidden = true;
+      signupFields.querySelector("[name=display_name]").required = false;
+      document.querySelector("#auth-title").textContent = "Sign in to continue";
+      authSubmit.textContent = "Sign in";
+      authToggle.textContent = "Create account";
+      setFormMessage(authMessage, "");
+      repairList.replaceChildren();
+      ["#stat-total", "#stat-pending", "#stat-progress", "#stat-completed"].forEach(
+        (selector) => {
+          document.querySelector(selector).textContent = "—";
+        },
+      );
+      document.querySelector("#repair-count-label").textContent = "";
       showGlobalMessage("You have signed out.");
       authForm.reset();
+      renderPhotoPreviews([]);
     } catch (error) {
       console.error("Customer sign-out failed:", error);
       showGlobalMessage(friendlyError(error), true);
@@ -532,12 +850,63 @@
     }
   });
 
-  document
-    .querySelector("#repair-photos")
-    .addEventListener("change", (event) => {
-      const message = validatePhotos(Array.from(event.currentTarget.files || []));
-      setFormMessage(bookingMessage, message, Boolean(message));
-    });
+  const renderPhotoPreviews = (files) => {
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls = [];
+    photoPreviewList.replaceChildren();
+    for (const [index, file] of files.entries()) {
+      const preview = makeText("article", "photo-preview");
+      const image = document.createElement("img");
+      const imageWrap = makeText("div", "photo-preview-image");
+      const objectUrl = URL.createObjectURL(file);
+      previewUrls.push(objectUrl);
+      image.src = objectUrl;
+      image.alt = "";
+      image.onerror = () => {
+        image.hidden = true;
+        imageWrap.append(makeText("span", "photo-file-icon", "IMG"));
+      };
+      imageWrap.append(image);
+      const fileInfo = document.createElement("div");
+      fileInfo.className = "photo-preview-info";
+      fileInfo.append(
+        makeText("strong", "", file.name),
+        makeText(
+          "span",
+          "",
+          file.size < 1024 * 1024
+            ? `${Math.max(1, Math.round(file.size / 1024))} KB`
+            : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        ),
+      );
+      const remove = makeText("button", "photo-remove", "Remove");
+      remove.type = "button";
+      remove.setAttribute("aria-label", `Remove ${file.name}`);
+      remove.addEventListener("click", () => {
+        const transfer = new DataTransfer();
+        selectedPhotos().forEach((selectedFile, selectedIndex) => {
+          if (selectedIndex !== index) transfer.items.add(selectedFile);
+        });
+        photoInput.files = transfer.files;
+        renderPhotoPreviews(selectedPhotos());
+        const message = validatePhotos(selectedPhotos());
+        setFormMessage(bookingMessage, message, Boolean(message));
+      });
+      preview.append(imageWrap, fileInfo, remove);
+      photoPreviewList.append(preview);
+    }
+  };
+
+  photoInput.addEventListener("change", () => {
+    const files = selectedPhotos();
+    renderPhotoPreviews(files);
+    const message = validatePhotos(files);
+    setFormMessage(
+      bookingMessage,
+      message || (files.length ? `${files.length} photo(s) ready to upload.` : ""),
+      Boolean(message),
+    );
+  });
 
   const start = async () => {
     if (!window.AdminSupabaseClient?.isConfigured()) {
